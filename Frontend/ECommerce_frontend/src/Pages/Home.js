@@ -15,7 +15,7 @@ const categories = [
 ];
 
 const Home = () => {
-  const { addToCart, toggleWishlist, wishlist, products, services } = useAppContext();
+  const { addToCart, toggleWishlist, wishlist, products, services, user } = useAppContext();
   const [activeTab, setActiveTab] = React.useState('products');
   const sliderRef = useRef(null);
   
@@ -44,19 +44,31 @@ const Home = () => {
         </div>
         <div className="relative max-w-7xl mx-auto px-6 py-24 sm:py-32 lg:px-8 flex flex-col items-start">
           <h1 className="text-4xl font-extrabold tracking-tight sm:text-5xl lg:text-6xl max-w-2xl">
-            Discover Exceptional Products for Your Lifestyle
+            {user?.isVendor ? 'Grow Your Business with UniBox' : 'Discover Exceptional Products for Your Lifestyle'}
           </h1>
           <p className="mt-6 text-xl max-w-xl text-indigo-100">
-            Shop the latest trends, newest electronics, and premium services all in one place. Experience seamless shopping today.
+            {user?.isVendor 
+              ? 'Manage your products, track sales, and connect with customers. Build your online store and reach more buyers today.'
+              : 'Shop the latest trends, newest electronics, and premium services all in one place. Experience seamless shopping today.'
+            }
           </p>
-          <div className="mt-10 flex gap-4">
-            <a href="#products" className="inline-flex items-center justify-center px-8 py-3 border border-transparent text-base font-medium rounded-full text-indigo-900 bg-white hover:bg-indigo-50 transition-colors shadow-lg hover:shadow-xl">
-              Shop Now
-            </a>
-            <Link to="/services" className="inline-flex items-center justify-center px-8 py-3 border-2 border-white text-base font-medium rounded-full text-white hover:bg-white/10 transition-colors">
-              Explore Services
-            </Link>
-          </div>
+          {!user?.isVendor && (
+            <div className="mt-10 flex gap-4">
+              <a href="#products" className="inline-flex items-center justify-center px-8 py-3 border border-transparent text-base font-medium rounded-full text-indigo-900 bg-white hover:bg-indigo-50 transition-colors shadow-lg hover:shadow-xl">
+                Shop Now
+              </a>
+              <Link to="/services" className="inline-flex items-center justify-center px-8 py-3 border-2 border-white text-base font-medium rounded-full text-white hover:bg-white/10 transition-colors">
+                Explore Services
+              </Link>
+            </div>
+          )}
+          {user?.isVendor && (
+            <div className="mt-10 flex gap-4">
+              <Link to="/vendor-login" className="inline-flex items-center justify-center px-8 py-3 border-2 border-white text-base font-medium rounded-full text-white hover:bg-white/10 transition-colors">
+                Manage Store
+              </Link>
+            </div>
+          )}
         </div>
       </section>
       
@@ -109,12 +121,14 @@ const Home = () => {
             const isWishlisted = wishlist.some(item => item.id === product.id);
             return (
               <div key={product.id} className="bg-white rounded-2xl p-4 shadow-sm hover:shadow-lg transition-all duration-300 border border-gray-100 group relative flex flex-col h-full">
-                <button 
-                  onClick={(e) => { e.preventDefault(); toggleWishlist(product); }}
-                  className="absolute top-6 right-6 z-10 bg-white/80 backdrop-blur-sm p-2 rounded-full text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors shadow-sm"
-                >
-                  <Heart className={`h-4 w-4 ${isWishlisted ? 'fill-red-500 text-red-500' : ''}`} />
-                </button>
+                {!user?.isVendor && (
+                  <button 
+                    onClick={(e) => { e.preventDefault(); toggleWishlist(product); }}
+                    className="absolute top-6 right-6 z-10 bg-white/80 backdrop-blur-sm p-2 rounded-full text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors shadow-sm"
+                  >
+                    <Heart className={`h-4 w-4 ${isWishlisted ? 'fill-red-500 text-red-500' : ''}`} />
+                  </button>
+                )}
                 <Link to={`/product/${product.id}`} className="block relative aspect-square overflow-hidden rounded-xl mb-4 bg-gray-100 flex-shrink-0">
                   <img src={product.image} alt={product.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" />
                 </Link>
@@ -129,13 +143,15 @@ const Home = () => {
                   <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">Sold by {product.vendor}</p>
                   <div className="mt-auto pt-3 flex items-center justify-between">
                     <p className="text-lg font-black text-indigo-600">₹{Number(product.price || 0).toFixed(2)}</p>
-                    <button 
-                      onClick={() => addToCart(product, 1, product.sizes?.[0])}
-                      className="bg-indigo-50 p-2.5 rounded-xl text-indigo-600 hover:bg-indigo-600 hover:text-white transition-all duration-300"
-                      title="Add to Cart"
-                    >
-                      <ShoppingCart className="h-4 w-4" />
-                    </button>
+                    {!user?.isVendor && (
+                      <button 
+                        onClick={() => addToCart(product, 1, product.sizes?.[0])}
+                        className="bg-indigo-50 p-2.5 rounded-xl text-indigo-600 hover:bg-indigo-600 hover:text-white transition-all duration-300"
+                        title="Add to Cart"
+                      >
+                        <ShoppingCart className="h-4 w-4" />
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>

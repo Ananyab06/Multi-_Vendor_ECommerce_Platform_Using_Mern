@@ -32,7 +32,7 @@ const Cart = () => {
     e.target.reset();
   };
 
-  const handleCheckout = (e) => {
+  const handleCheckout = async (e) => {
     e.preventDefault();
     
     // Simulate payment failure check
@@ -60,10 +60,25 @@ const Cart = () => {
       itemsCount: cart.reduce((acc, item) => acc + item.quantity, 0),
       items: cart.map(i => ({ id: i.id, name: i.name, qty: i.quantity, price: i.price, size: i.size, vendor: i.vendor }))
     };
-    addOrder(newOrder);
-    
-    setCheckoutStep('success');
-    setCart([]);
+
+    // Prepare data for backend API
+    const orderData = {
+      shippingAddress: {
+        street: formData.get('address') || '',
+        city: formData.get('city') || '',
+        state: formData.get('state') || '',
+        zipCode: formData.get('zipCode') || '',
+        country: 'India'
+      },
+      paymentMethod: paymentMethod
+    };
+
+    const result = await addOrder(orderData);
+    if (result.success) {
+      setCheckoutStep('success');
+    } else {
+      alert(`Order failed: ${result.error}`);
+    }
   };
 
   useEffect(() => {

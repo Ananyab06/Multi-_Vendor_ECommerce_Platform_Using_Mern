@@ -32,13 +32,15 @@ export const AppProvider = ({ children }) => {
     fetchProducts();
   }, []);
 
-  // Fetch cart and wishlist when user logs in
+  // Fetch cart, wishlist, and orders when user logs in
   useEffect(() => {
     if (user) {
       const fetchUserData = async () => {
         try {
           const cartRes = await api.getCart();
           const wishlistRes = await api.getWishlist();
+          const ordersRes = await api.getUserOrders();
+          
           // Transform backend data to match frontend structure
           if (cartRes.data && cartRes.data.items) {
             const cartItems = cartRes.data.items.map(item => ({
@@ -48,8 +50,28 @@ export const AppProvider = ({ children }) => {
             }));
             setCart(cartItems);
           }
+
           if (wishlistRes.data && wishlistRes.data.products) {
             setWishlist(wishlistRes.data.products);
+          }
+
+          if (ordersRes.data) {
+            // Transform backend orders to match frontend structure
+            const transformedOrders = ordersRes.data.map(order => ({
+              id: order._id,
+              date: new Date(order.createdAt).toISOString().split('T')[0],
+              items: order.items.map(item => ({
+                id: item.productId._id || item.productId,
+                name: item.name,
+                price: item.price,
+                qty: item.qty,
+                size: item.size,
+                vendor: item.vendor,
+              })),
+              total: order.totalAmount,
+              status: order.status,
+            }));
+            setOrders(transformedOrders);
           }
         } catch (err) {
           console.error('Failed to fetch user data', err);
@@ -57,9 +79,10 @@ export const AppProvider = ({ children }) => {
       };
       fetchUserData();
     } else {
-      // Clear cart and wishlist when no user
+      // Clear cart, wishlist, and orders when no user
       setCart([]);
       setWishlist([]);
+      setOrders([]);
     }
   }, [user]);
 
@@ -175,18 +198,31 @@ export const AppProvider = ({ children }) => {
     setServiceBookings(prev => prev.map(b => b.id === bookingId ? { ...b, status: newStatus } : b));
   };
 
-  const addOrder = (order) => {
-    setOrders((prev) => [order, ...prev]);
-    // Decrease stock for each item in the order
-    setProducts(prevProducts => {
-      return prevProducts.map(product => {
-        const orderItem = order.items.find(item => item.id === product.id);
-        if (orderItem) {
-          return { ...product, stock: Math.max(0, product.stock - orderItem.qty) };
-        }
-        return product;
-      });
-    });
+  const addOrder = async (orderData) => {
+    try {
+      // Call backend to create order
+      const response = await api.createOrder(orderData);
+      
+      // Transform backend response to match frontend structure
+      const newOrder = {
+        id: response.data.order.id,
+        date: new Date().toISOString().split('T')[0],
+        items: response.data.order.items,
+        total: response.data.order.totalAmount,
+        status: response.data.order.status,
+      };
+
+      // Update local state
+      setOrders((prev) => [newOrder, ...prev]);
+
+      // Clear cart after successful order
+      setCart([]);
+
+      return { success: true, order: newOrder };
+    } catch (error) {
+      console.error('Failed to create order:', error);
+      return { success: false, error: error.response?.data?.message || 'Failed to create order' };
+    }
   };
 
   const updateCartItemSize = (productId, oldSize, newSize) => {

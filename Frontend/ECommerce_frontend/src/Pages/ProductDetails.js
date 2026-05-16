@@ -8,7 +8,7 @@ import { fetchProductById } from '../api.js';
 const ProductDetails = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { addToCart, toggleWishlist, wishlist, products } = useAppContext();
+  const { addToCart, toggleWishlist, wishlist, products, user } = useAppContext();
   
   const [product, setProduct] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -133,18 +133,22 @@ const ProductDetails = () => {
           </div>
 
           <div className="flex flex-col sm:flex-row gap-4 mt-auto">
-            <button 
-              onClick={handleAddToCart}
-              className="flex-1 bg-indigo-600 text-white py-4 px-8 rounded-full font-bold hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-200 flex justify-center items-center gap-2"
-            >
-              <ShoppingCart className="h-5 w-5" /> Add to Cart
-            </button>
-            <button 
-              onClick={() => toggleWishlist(product)}
-              className={`py-4 px-8 rounded-full font-bold border flex justify-center items-center gap-2 transition-colors ${isWishlisted ? 'border-red-200 bg-red-50 text-red-600' : 'border-gray-200 text-gray-700 hover:bg-gray-50'}`}
-            >
-              <Heart className={`h-5 w-5 ${isWishlisted ? 'fill-current' : ''}`} /> {isWishlisted ? 'Saved' : 'Wishlist'}
-            </button>
+            {!user?.isVendor && (
+              <button 
+                onClick={handleAddToCart}
+                className="flex-1 bg-indigo-600 text-white py-4 px-8 rounded-full font-bold hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-200 flex justify-center items-center gap-2"
+              >
+                <ShoppingCart className="h-5 w-5" /> Add to Cart
+              </button>
+            )}
+            {!user?.isVendor && (
+              <button 
+                onClick={() => toggleWishlist(product)}
+                className={`py-4 px-8 rounded-full font-bold border flex justify-center items-center gap-2 transition-colors ${isWishlisted ? 'border-red-200 bg-red-50 text-red-600' : 'border-gray-200 text-gray-700 hover:bg-gray-50'}`}
+              >
+                <Heart className={`h-5 w-5 ${isWishlisted ? 'fill-current' : ''}`} /> {isWishlisted ? 'Saved' : 'Wishlist'}
+              </button>
+            )}
           </div>
 
           <div className="grid grid-cols-2 gap-4 mt-8 pt-8 border-t border-gray-100 text-sm text-gray-600">

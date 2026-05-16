@@ -29,6 +29,7 @@ const vendorRoutes = require('./routes/vendor');
 const productRoutes = require('./routes/product');
 const cartRoutes = require('./routes/cart');
 const wishlistRoutes = require('./routes/wishlist');
+const orderRoutes = require('./routes/order');
 
 // Use routes
 app.use('/api/auth', authRoutes);
@@ -36,6 +37,7 @@ app.use('/api/vendor', vendorRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/cart', cartRoutes);
 app.use('/api/wishlist', wishlistRoutes);
+app.use('/api/orders', orderRoutes);
 
 // Start server
 app.listen(PORT, () => {

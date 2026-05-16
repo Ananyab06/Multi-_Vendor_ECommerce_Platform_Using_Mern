@@ -45,4 +45,11 @@ export const addToWishlist = (productId) => API.post('/wishlist/add', { productI
 export const removeFromWishlist = (productId) => API.delete('/wishlist/remove', { data: { productId } });
 export const clearWishlist = () => API.delete('/wishlist/clear');
 
+// Order APIs
+export const createOrder = (orderData) => API.post('/orders', orderData);
+export const getUserOrders = () => API.get('/orders/user');
+export const getVendorOrders = (vendorId) => API.get(`/orders/vendor/${vendorId}`);
+export const getAllOrders = () => API.get('/orders/all');
+export const updateOrderStatus = (orderId, status) => API.put(`/orders/${orderId}/status`, { status });
+
 export default API;

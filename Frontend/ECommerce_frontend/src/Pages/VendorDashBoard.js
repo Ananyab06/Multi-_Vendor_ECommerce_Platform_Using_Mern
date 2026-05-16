@@ -32,6 +32,44 @@ const VendorDashboard = () => {
     }
   }, [currentUser, navigate]);
 
+  // Fetch vendor orders
+  useEffect(() => {
+    if (currentUser && currentUser.isVendor && currentUser._id) {
+      const fetchVendorOrders = async () => {
+        try {
+          const response = await fetch(`http://localhost:5000/api/orders/vendor/${currentUser._id}`, {
+            headers: {
+              'Authorization': `Bearer ${localStorage.getItem('token')}`
+            }
+          });
+          if (response.ok) {
+            const data = await response.json();
+            // Transform backend orders to match frontend structure
+            const transformedOrders = data.map(order => ({
+              id: order._id,
+              date: new Date(order.createdAt).toISOString().split('T')[0],
+              items: order.items.map(item => ({
+                id: item.productId._id || item.productId,
+                name: item.name,
+                price: item.price,
+                qty: item.qty,
+                size: item.size,
+                vendor: item.vendor,
+              })),
+              total: order.totalAmount,
+              status: order.status,
+              customer: order.userId.name || 'Unknown Customer',
+            }));
+            setVendorOrders(transformedOrders);
+          }
+        } catch (error) {
+          console.error('Failed to fetch vendor orders:', error);
+        }
+      };
+      fetchVendorOrders();
+    }
+  }, [currentUser]);
+
   const [activeTab, setActiveTab] = useState('dashboard');
   const [inventorySubTab, setInventorySubTab] = useState('all'); // 'all', 'product', 'service'
   const [notifications, setNotifications] = useState([]);
@@ -39,23 +77,37 @@ const VendorDashboard = () => {
   const [isAddingItem, setIsAddingItem] = useState(false);
   const [activeToast, setActiveToast] = useState(null);
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth()); // 0-11
+  const [vendorOrders, setVendorOrders] = useState([]);
 
   const prevOrdersCount = useRef(globalOrders.length);
 
   // Vendor Profile
   const [profile, setProfile] = useState({
     name: currentUser?.name || '',
-    storeName: currentUser?.companyName || 'My Store',
+    storeName: currentUser?.companyName || currentUser?.storeName || 'My Store',
     email: currentUser?.email || '',
     phone: currentUser?.mobile || '',
     description: 'Premium electronics and professional tech services.'
   });
 
+  useEffect(() => {
+    if (currentUser) {
+      setProfile(prev => ({
+        ...prev,
+        name: currentUser.name || prev.name,
+        storeName: currentUser.companyName || currentUser.storeName || prev.storeName,
+        email: currentUser.email || prev.email,
+        phone: currentUser.mobile || prev.phone,
+      }));
+    }
+  }, [currentUser]);
+
   // Combine products and services for inventory view using useMemo for reactivity
   const inventory = React.useMemo(() => {
+    const vendorName = profile.storeName?.toLowerCase().trim();
     let items = [
-      ...products.filter(p => p.vendor === profile.storeName).map(p => ({ ...p, type: 'product', sku: `SKU-${p.id + 50000}` })),
-      ...services.filter(s => s.vendor === profile.storeName).map(s => ({ ...s, type: 'service', sku: `SRV-${s.id + 100}` }))
+      ...products.filter(p => p.vendor?.toLowerCase().trim() === vendorName).map(p => ({ ...p, type: 'product', sku: `SKU-${p.id + 50000}` })),
+      ...services.filter(s => s.vendor?.toLowerCase().trim() === vendorName).map(s => ({ ...s, type: 'service', sku: `SRV-${s.id + 100}` }))
     ];
     if (inventorySubTab === 'product') return items.filter(i => i.type === 'product');
     if (inventorySubTab === 'service') return items.filter(i => i.type === 'service');
@@ -70,35 +122,36 @@ const VendorDashboard = () => {
 
   // Dynamic Dashboard Stats
   const stats = React.useMemo(() => {
-    const vendorProducts = products.filter(p => p.vendor === profile.storeName);
+    const vendorName = profile.storeName?.toLowerCase().trim();
+    const vendorProducts = products.filter(p => p.vendor?.toLowerCase().trim() === vendorName);
     const vendorProductNames = new Set(vendorProducts.map(p => p.name));
     
-    // Calculate orders that contain this vendor's products
-    const vendorOrders = globalOrders.filter(order => 
+    // Use vendorOrders instead of filtering globalOrders
+    const vendorProductOrders = vendorOrders.filter(order => 
       order.items.some(item => 
-        (item.vendor?.toLowerCase().trim() === profile.storeName?.toLowerCase().trim()) || 
+        (item.vendor?.toLowerCase().trim() === vendorName) || 
         vendorProductNames.has(item.name)
       )
     );
 
     // Calculate total revenue from this vendor's products
-    const productRevenue = vendorOrders.reduce((sum, order) => {
+    const productRevenue = vendorProductOrders.reduce((sum, order) => {
       const vendorItems = order.items.filter(item => 
-        (item.vendor?.toLowerCase().trim() === profile.storeName?.toLowerCase().trim()) || 
+        (item.vendor?.toLowerCase().trim() === vendorName) || 
         vendorProductNames.has(item.name)
       );
       return sum + vendorItems.reduce((iSum, item) => iSum + ((Number(item.price) || 0) * (Number(item.qty) || 1)), 0);
     }, 0);
 
     const vendorBookings = serviceBookings.filter(booking => 
-      booking.vendor?.toLowerCase().trim() === profile.storeName?.toLowerCase().trim()
+      booking.vendor?.toLowerCase().trim() === vendorName
     );
     const serviceRevenue = vendorBookings.reduce((sum, booking) => sum + (Number(booking.price) || 0), 0);
 
     const revenue = productRevenue + serviceRevenue;
 
     // Mock visitors based on products and orders (starts at 0 for new vendors)
-    const visitors = (vendorProducts.length * 5) + (vendorOrders.length * 12);
+    const visitors = (vendorProducts.length * 5) + (vendorProductOrders.length * 12);
 
     // Dynamic chart data: group revenue by date for the selected month
     const currentYear = new Date().getFullYear();
@@ -108,11 +161,11 @@ const VendorDashboard = () => {
       const dateStr = `${currentYear}-${String(selectedMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
       
       // Get product revenue for this day
-      const dailyProductRevenue = vendorOrders
+      const dailyProductRevenue = vendorProductOrders
         .filter(order => order.date === dateStr)
         .reduce((sum, order) => {
           const vItems = order.items.filter(item => 
-            (item.vendor?.toLowerCase().trim() === profile.storeName?.toLowerCase().trim()) || 
+            (item.vendor?.toLowerCase().trim() === vendorName) || 
             vendorProductNames.has(item.name)
           );
           return sum + vItems.reduce((iSum, item) => iSum + ((Number(item.price) || 0) * (Number(item.qty) || 1)), 0);
@@ -137,13 +190,13 @@ const VendorDashboard = () => {
 
     return {
       revenue: `₹${revenue.toLocaleString()}`,
-      orders: (vendorOrders.length + vendorBookings.length).toLocaleString(),
+      orders: (vendorProductOrders.length + vendorBookings.length).toLocaleString(),
       visitors: visitors.toLocaleString(),
       revenueTrend: revenue > 0 ? "↑ 100%" : "0%",
-      ordersTrend: (vendorOrders.length + vendorBookings.length) > 0 ? "↑ 100%" : "0%",
+      ordersTrend: (vendorProductOrders.length + vendorBookings.length) > 0 ? "↑ 100%" : "0%",
       visitorsTrend: visitors > 0 ? "↑ 100%" : "0%",
       rawRevenue: revenue,
-      vendorOrders: vendorOrders,
+      vendorOrders: vendorProductOrders,
       vendorBookings: vendorBookings,
       chartData,
       maxDailyRevenue
@@ -159,13 +212,14 @@ const VendorDashboard = () => {
   useEffect(() => {
     if (globalOrders.length > prevOrdersCount.current) {
       const newOrder = globalOrders[0];
+      const vendorName = profile.storeName?.toLowerCase().trim();
       const hasVendorItems = newOrder.items.some(item => 
-        item.vendor === profile.storeName || products.some(p => p.name === item.name && p.vendor === profile.storeName)
+        item.vendor?.toLowerCase().trim() === vendorName || products.some(p => p.name === item.name && p.vendor?.toLowerCase().trim() === vendorName)
       );
 
       if (hasVendorItems) {
         const vendorItems = newOrder.items.filter(item => 
-          item.vendor === profile.storeName || products.some(p => p.name === item.name && p.vendor === profile.storeName)
+          item.vendor?.toLowerCase().trim() === vendorName || products.some(p => p.name === item.name && p.vendor?.toLowerCase().trim() === vendorName)
         );
         const vendorTotal = vendorItems.reduce((sum, item) => sum + (item.price * item.qty), 0);
 

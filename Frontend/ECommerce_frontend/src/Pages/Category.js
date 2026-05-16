@@ -7,7 +7,7 @@ import { productsDB } from '../data';
 
 const Category = () => {
   const { name } = useParams();
-  const { addToCart, toggleWishlist, wishlist, products } = useAppContext();
+  const { addToCart, toggleWishlist, wishlist, products, user } = useAppContext();
   
   // Filter state
   const [maxPrice, setMaxPrice] = useState(10000);
@@ -113,12 +113,14 @@ const Category = () => {
               const isWishlisted = wishlist.some(item => item.id === product.id);
               return (
                 <div key={product.id} className="bg-white rounded-2xl p-4 shadow-sm hover:shadow-lg transition-shadow duration-300 border border-gray-100 group relative flex flex-col h-full">
-                  <button 
-                    onClick={(e) => { e.preventDefault(); toggleWishlist(product); }}
-                    className="absolute top-6 right-6 z-10 bg-white/80 backdrop-blur-sm p-2 rounded-full text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors shadow-sm"
-                  >
-                    <Heart className={`h-4 w-4 ${isWishlisted ? 'fill-red-500 text-red-500' : ''}`} />
-                  </button>
+                  {!user?.isVendor && (
+                    <button 
+                      onClick={(e) => { e.preventDefault(); toggleWishlist(product); }}
+                      className="absolute top-6 right-6 z-10 bg-white/80 backdrop-blur-sm p-2 rounded-full text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors shadow-sm"
+                    >
+                      <Heart className={`h-4 w-4 ${isWishlisted ? 'fill-red-500 text-red-500' : ''}`} />
+                    </button>
+                  )}
                   <Link to={`/product/${product.id}`} className="block relative aspect-square overflow-hidden rounded-xl mb-4 bg-gray-100 flex-shrink-0">
                     <img src={product.image} alt={product.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
                   </Link>
@@ -132,13 +134,15 @@ const Category = () => {
                     </Link>
                     <div className="mt-auto pt-3 flex items-center justify-between">
                       <p className="text-lg font-bold text-indigo-600">₹{product.price.toFixed(2)}</p>
-                      <button 
-                        onClick={() => addToCart(product, 1, product.sizes?.[0])}
-                        className="bg-indigo-50 p-2 rounded-full text-indigo-600 hover:bg-indigo-600 hover:text-white transition-colors"
-                        title="Add to Cart"
-                      >
-                        <ShoppingCart className="h-4 w-4" />
-                      </button>
+                      {!user?.isVendor && (
+                        <button 
+                          onClick={() => addToCart(product, 1, product.sizes?.[0])}
+                          className="bg-indigo-50 p-2 rounded-full text-indigo-600 hover:bg-indigo-600 hover:text-white transition-colors"
+                          title="Add to Cart"
+                        >
+                          <ShoppingCart className="h-4 w-4" />
+                        </button>
+                      )}
                     </div>
                   </div>
                 </div>

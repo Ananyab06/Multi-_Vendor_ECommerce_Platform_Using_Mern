@@ -1,3 +1,4 @@
+import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ShoppingCart, Heart, User, Search as SearchIcon, Menu, X, ShoppingBag } from 'lucide-react';
 import { useAppContext } from '../Context/AppContext';
@@ -46,16 +47,20 @@ const Navbar = () => {
 
           <div className="hidden lg:ml-6 lg:flex lg:items-center space-x-6">
             <Link to="/vendor-login" className="px-4 py-2 bg-indigo-50 text-indigo-700 rounded-full text-sm font-bold hover:bg-indigo-100 transition-all border border-indigo-100">Sell</Link>
-            <Link to="/services" className="text-gray-600 hover:text-indigo-600 font-medium transition-colors">Services</Link>
+            {!user?.isVendor && <Link to="/services" className="text-gray-600 hover:text-indigo-600 font-medium transition-colors">Services</Link>}
             <div className="h-6 w-px bg-gray-200"></div>
-            <Link to="/wishlist" className="text-gray-500 hover:text-indigo-600 transition-colors relative">
-              <Heart className="h-6 w-6" />
-              {wishlist.length > 0 && <span className="absolute -top-2 -right-2 inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-white transform translate-x-1/2 -translate-y-1/2 bg-red-500 rounded-full">{wishlist.length}</span>}
-            </Link>
-            <Link to="/cart" className="text-gray-500 hover:text-indigo-600 transition-colors relative">
-              <ShoppingCart className="h-6 w-6" />
-              {cartCount > 0 && <span className="absolute -top-2 -right-2 inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-white transform translate-x-1/2 -translate-y-1/2 bg-indigo-600 rounded-full">{cartCount}</span>}
-            </Link>
+            {!user?.isVendor && (
+              <>
+                <Link to="/wishlist" className="text-gray-500 hover:text-indigo-600 transition-colors relative">
+                  <Heart className="h-6 w-6" />
+                  {wishlist.length > 0 && <span className="absolute -top-2 -right-2 inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-white transform translate-x-1/2 -translate-y-1/2 bg-red-500 rounded-full">{wishlist.length}</span>}
+                </Link>
+                <Link to="/cart" className="text-gray-500 hover:text-indigo-600 transition-colors relative">
+                  <ShoppingCart className="h-6 w-6" />
+                  {cartCount > 0 && <span className="absolute -top-2 -right-2 inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-white transform translate-x-1/2 -translate-y-1/2 bg-indigo-600 rounded-full">{cartCount}</span>}
+                </Link>
+              </>
+            )}
             
             {user ? (
               <Link to="/profile" className="text-gray-500 hover:text-indigo-600 transition-colors mr-2 flex items-center gap-2">
@@ -85,9 +90,9 @@ const Navbar = () => {
         <div className="lg:hidden">
           <div className="pt-2 pb-3 space-y-1">
             <Link to="/vendor-login" className="block pl-3 pr-4 py-2 border-l-4 border-indigo-500 text-base font-bold text-indigo-700 bg-indigo-50">Sell on Unibox</Link>
-            <Link to="/services" className="block pl-3 pr-4 py-2 border-l-4 border-transparent text-base font-medium text-gray-600 hover:text-indigo-800 hover:bg-indigo-50 hover:border-indigo-500">Services</Link>
-            <Link to="/wishlist" className="block pl-3 pr-4 py-2 border-l-4 border-transparent text-base font-medium text-gray-600 hover:text-indigo-800 hover:bg-indigo-50 hover:border-indigo-500">Wishlist ({wishlist.length})</Link>
-            <Link to="/cart" className="block pl-3 pr-4 py-2 border-l-4 border-transparent text-base font-medium text-gray-600 hover:text-indigo-800 hover:bg-indigo-50 hover:border-indigo-500">Cart ({cartCount})</Link>
+            {!user?.isVendor && <Link to="/services" className="block pl-3 pr-4 py-2 border-l-4 border-transparent text-base font-medium text-gray-600 hover:text-indigo-800 hover:bg-indigo-50 hover:border-indigo-500">Services</Link>}
+            {!user?.isVendor && <Link to="/wishlist" className="block pl-3 pr-4 py-2 border-l-4 border-transparent text-base font-medium text-gray-600 hover:text-indigo-800 hover:bg-indigo-50 hover:border-indigo-500">Wishlist ({wishlist.length})</Link>}
+            {!user?.isVendor && <Link to="/cart" className="block pl-3 pr-4 py-2 border-l-4 border-transparent text-base font-medium text-gray-600 hover:text-indigo-800 hover:bg-indigo-50 hover:border-indigo-500">Cart ({cartCount})</Link>}
             {user ? (
               <Link to="/profile" className="block pl-3 pr-4 py-2 border-l-4 border-transparent text-base font-medium text-gray-600 hover:text-indigo-800 hover:bg-indigo-50 hover:border-indigo-500">Profile</Link>
             ) : (

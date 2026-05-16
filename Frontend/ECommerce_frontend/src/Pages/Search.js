@@ -7,7 +7,7 @@ import { productsDB, servicesDB } from '../data';
 const Search = () => {
   const [searchParams] = useSearchParams();
   const query = searchParams.get('q') || '';
-  const { addToCart, toggleWishlist, wishlist, products, services } = useAppContext();
+  const { addToCart, toggleWishlist, wishlist, products, services, user } = useAppContext();
   const [searchType, setSearchType] = React.useState('all'); // 'all', 'product', 'service'
 
   const searchResults = useMemo(() => {
@@ -59,7 +59,7 @@ const Search = () => {
             
             return (
               <div key={`${item.type}-${item.id}`} className="bg-white rounded-2xl p-4 shadow-sm hover:shadow-lg transition-shadow duration-300 border border-gray-100 group relative flex flex-col h-full">
-                {isProduct && (
+                {isProduct && !user?.isVendor && (
                   <button 
                     onClick={(e) => { e.preventDefault(); toggleWishlist(item); }}
                     className="absolute top-6 right-6 z-10 bg-white/80 backdrop-blur-sm p-2 rounded-full text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors shadow-sm"
@@ -89,13 +89,15 @@ const Search = () => {
                       {!isProduct ? 'From ' : ''}₹{Number(item.price || 0).toFixed(2)}
                     </p>
                     {isProduct ? (
-                      <button 
-                        onClick={() => addToCart(item, 1, item.sizes?.[0])}
-                        className="bg-indigo-50 p-2 rounded-full text-indigo-600 hover:bg-indigo-600 hover:text-white transition-colors"
-                        title="Add to Cart"
-                      >
-                        <ShoppingCart className="h-4 w-4" />
-                      </button>
+                      !user?.isVendor && (
+                        <button 
+                          onClick={() => addToCart(item, 1, item.sizes?.[0])}
+                          className="bg-indigo-50 p-2 rounded-full text-indigo-600 hover:bg-indigo-600 hover:text-white transition-colors"
+                          title="Add to Cart"
+                        >
+                          <ShoppingCart className="h-4 w-4" />
+                        </button>
+                      )
                     ) : (
                       <Link to="/services" className="bg-teal-50 p-2 rounded-full text-teal-600 hover:bg-teal-600 hover:text-white transition-colors">
                         <Calendar className="h-4 w-4" />
