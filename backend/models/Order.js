@@ -27,6 +27,10 @@ const orderItemSchema = new mongoose.Schema({
     type: String,
     required: true,
   },
+  vendorId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Vendor',
+  },
 });
 
 const orderSchema = new mongoose.Schema({
@@ -66,5 +70,6 @@ const orderSchema = new mongoose.Schema({
 // Index for efficient queries
 orderSchema.index({ userId: 1, createdAt: -1 });
 orderSchema.index({ 'items.vendor': 1 });
+orderSchema.index({ 'items.vendorId': 1 });
 
 module.exports = mongoose.model('Order', orderSchema);

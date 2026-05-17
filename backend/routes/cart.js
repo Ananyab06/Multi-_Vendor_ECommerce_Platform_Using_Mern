@@ -8,6 +8,7 @@ router.use(auth);
 
 router.get('/', cartController.getCart);
 router.post('/add', cartController.addToCart);
+router.put('/update', cartController.updateCartItem);
 router.delete('/remove', cartController.removeFromCart);
 router.delete('/clear', cartController.clearCart);
 

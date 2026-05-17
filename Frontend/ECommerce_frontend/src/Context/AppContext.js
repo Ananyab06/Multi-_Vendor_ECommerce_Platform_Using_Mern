@@ -1,4 +1,4 @@
-import React, { createContext, useState, useContext, useEffect } from 'react';
+import React, { createContext, useState, useContext, useEffect, useCallback } from 'react';
 import { productsDB, servicesDB } from '../data';
 import * as api from '../api';
 
@@ -7,48 +7,137 @@ const AppContext = createContext();
 export const AppProvider = ({ children }) => {
   const [cart, setCart] = useState([]);
   const [wishlist, setWishlist] = useState([]);
-  const [user, setUser] = useState(null); // Auth state
+  const [user, setUser] = useState(null);
+  const [authLoading, setAuthLoading] = useState(true);
   const [serviceBookings, setServiceBookings] = useState([]);
   const [orders, setOrders] = useState([]);
   const [products, setProducts] = useState(Object.values(productsDB));
   const [services, setServices] = useState(servicesDB);
   const [loading, setLoading] = useState(false);
 
-  // Fetch products from backend on mount
+  // Restore login session from token after page refresh
   useEffect(() => {
-    const fetchProducts = async () => {
+    const restoreSession = async () => {
+      const token = localStorage.getItem('token');
+      const accountType = localStorage.getItem('accountType');
+
+      if (!token) {
+        setAuthLoading(false);
+        return;
+      }
+
+      const setVendorUser = (vendor) => {
+        setUser({
+          id: vendor._id?.toString() || vendor.id,
+          name: vendor.name,
+          email: vendor.email,
+          storeName: vendor.storeName,
+          isVendor: true,
+        });
+      };
+
+      const setCustomerUser = (customer) => {
+        setUser({
+          id: customer._id?.toString() || customer.id,
+          name: customer.name,
+          email: customer.email,
+          role: customer.role,
+          isVendor: false,
+        });
+      };
+
       try {
-        setLoading(true);
-        const response = await api.fetchProducts();
-        if (response.data && Array.isArray(response.data)) {
-          setProducts(response.data);
+        if (accountType === 'vendor') {
+          const res = await api.getCurrentVendor();
+          setVendorUser(res.data);
+        } else if (accountType === 'user') {
+          const res = await api.getCurrentUser();
+          setCustomerUser(res.data);
+        } else {
+          try {
+            const res = await api.getCurrentUser();
+            setCustomerUser(res.data);
+            localStorage.setItem('accountType', 'user');
+          } catch {
+            const res = await api.getCurrentVendor();
+            setVendorUser(res.data);
+            localStorage.setItem('accountType', 'vendor');
+          }
         }
       } catch (err) {
-        console.error('Failed to fetch products from backend, using local data', err);
+        console.error('Session restore failed', err);
+        localStorage.removeItem('token');
+        localStorage.removeItem('accountType');
+        setUser(null);
+      } finally {
+        setAuthLoading(false);
+      }
+    };
+
+    restoreSession();
+  }, []);
+
+  // Fetch products and services from backend on mount
+  useEffect(() => {
+    const fetchCatalog = async () => {
+      try {
+        setLoading(true);
+        const [productsRes, servicesRes] = await Promise.all([
+          api.fetchProducts(),
+          api.fetchServices(),
+        ]);
+        if (productsRes.data && Array.isArray(productsRes.data)) {
+          setProducts(productsRes.data);
+        }
+        if (servicesRes.data && Array.isArray(servicesRes.data)) {
+          setServices(servicesRes.data);
+        }
+      } catch (err) {
+        console.error('Failed to fetch catalog from backend, using local data', err);
       } finally {
         setLoading(false);
       }
     };
-    fetchProducts();
+    fetchCatalog();
   }, []);
 
-  // Fetch cart, wishlist, and orders when user logs in
+  const mapProductToCartItem = (product, quantity, size = null) => {
+    if (!product) return null;
+    return {
+      id: product._id?.toString() || product.id,
+      name: product.name,
+      price: product.price,
+      image: product.image,
+      category: product.category,
+      vendor: product.vendorId?.storeName || product.vendor || 'Unknown Vendor',
+      quantity,
+      size,
+    };
+  };
+
+  // Fetch cart, wishlist, and orders when customer logs in
   useEffect(() => {
-    if (user) {
+    if (authLoading) return;
+
+    if (user && !user.isVendor) {
       const fetchUserData = async () => {
         try {
           const cartRes = await api.getCart();
           const wishlistRes = await api.getWishlist();
           const ordersRes = await api.getUserOrders();
+          const bookingsRes = await api.getUserServiceBookings();
+
+          if (bookingsRes.data) {
+            setServiceBookings(bookingsRes.data);
+          }
           
-          // Transform backend data to match frontend structure
-          if (cartRes.data && cartRes.data.items) {
-            const cartItems = cartRes.data.items.map(item => ({
-              ...item.productId,
-              quantity: item.quantity,
-              size: item.size || null,
-            }));
+          if (cartRes.data?.items?.length) {
+            const cartItems = cartRes.data.items
+              .map((item) => mapProductToCartItem(item.productId, item.quantity, item.size || null))
+              .filter(Boolean);
             setCart(cartItems);
+          } else {
+            setCart([]);
           }
 
           if (wishlistRes.data && wishlistRes.data.products) {
@@ -78,13 +167,26 @@ export const AppProvider = ({ children }) => {
         }
       };
       fetchUserData();
+    } else if (user?.isVendor) {
+      const fetchVendorBookings = async () => {
+        try {
+          const vendorId = user.id || user._id;
+          const bookingsRes = await api.getVendorServiceBookings(vendorId);
+          const bookings = bookingsRes.data?.bookings || bookingsRes.data || [];
+          setServiceBookings(Array.isArray(bookings) ? bookings : []);
+        } catch (err) {
+          console.error('Failed to fetch vendor service bookings', err);
+          setServiceBookings([]);
+        }
+      };
+      fetchVendorBookings();
     } else {
-      // Clear cart, wishlist, and orders when no user
       setCart([]);
       setWishlist([]);
       setOrders([]);
+      setServiceBookings([]);
     }
-  }, [user]);
+  }, [user, authLoading]);
 
   const addProduct = async (newProduct) => {
     try {
@@ -166,41 +268,138 @@ export const AppProvider = ({ children }) => {
     }
   };
 
-  const addService = (newService) => {
-    setServices(prev => [...prev, { ...newService, id: Date.now() }]);
+  const addService = async (newService) => {
+    try {
+      const serviceData = { ...newService };
+      delete serviceData.id;
+      delete serviceData.type;
+      delete serviceData.sku;
+      delete serviceData.stock;
+
+      const response = await api.createService(serviceData);
+      const created = response.data.service;
+      setServices((prev) => [...prev, created]);
+      return created;
+    } catch (err) {
+      console.error('Failed to add service', err);
+      alert(err.response?.data?.message || 'Failed to add service');
+      throw err;
+    }
   };
 
-  const updateService = (updatedService) => {
-    setServices(prev => prev.map(s => s.id === updatedService.id ? updatedService : s));
+  const updateService = async (updatedService) => {
+    try {
+      const serviceData = { ...updatedService };
+      const serviceId = serviceData.id;
+      delete serviceData.id;
+      delete serviceData.type;
+      delete serviceData.sku;
+      delete serviceData.stock;
+
+      const response = await api.updateService(serviceId, serviceData);
+      const updated = response.data.service;
+      setServices((prev) => prev.map((s) => (s.id === serviceId ? updated : s)));
+      return updated;
+    } catch (err) {
+      console.error('Failed to update service', err);
+      alert(err.response?.data?.message || 'Failed to update service');
+      throw err;
+    }
   };
 
-  const deleteService = (id) => {
-    setServices(prev => prev.filter(s => s.id !== id));
+  const deleteService = async (id) => {
+    try {
+      await api.deleteService(id);
+      setServices((prev) => prev.filter((s) => s.id !== id));
+    } catch (err) {
+      console.error('Failed to delete service', err);
+      alert(err.response?.data?.message || 'Failed to delete service');
+      throw err;
+    }
   };
 
   const login = (userData, token) => {
-    setUser(userData);
+    const normalized = {
+      ...userData,
+      id: userData.id || userData._id,
+    };
+    setUser(normalized);
     localStorage.setItem('token', token);
+    localStorage.setItem('accountType', normalized.isVendor ? 'vendor' : 'user');
   };
 
   const logout = () => {
     setUser(null);
     setCart([]);
     setWishlist([]);
+    setOrders([]);
+    setServiceBookings([]);
     localStorage.removeItem('token');
+    localStorage.removeItem('accountType');
   };
 
-  const addServiceBooking = (booking) => {
-    setServiceBookings((prev) => [...prev, booking]);
+  const addServiceBooking = async (booking) => {
+    if (!user || user.isVendor) {
+      alert('Please login as a customer to book a service.');
+      return { success: false };
+    }
+
+    try {
+      const response = await api.createServiceBooking(booking);
+      const saved = response.data.booking;
+      setServiceBookings((prev) => [...prev, saved]);
+      return { success: true, booking: saved };
+    } catch (err) {
+      console.error('Failed to book service', err);
+      const message = err.response?.data?.message || 'Failed to book service';
+      alert(message);
+      return { success: false, error: message };
+    }
   };
 
-  const updateServiceBookingStatus = (bookingId, newStatus) => {
-    setServiceBookings(prev => prev.map(b => b.id === bookingId ? { ...b, status: newStatus } : b));
+  const updateServiceBookingStatus = async (bookingId, newStatus) => {
+    try {
+      const response = await api.updateServiceBookingStatus(bookingId, newStatus);
+      const updated = response.data.booking;
+      setServiceBookings((prev) =>
+        prev.map((b) => (b.id === bookingId ? { ...b, ...updated } : b))
+      );
+    } catch (err) {
+      console.error('Failed to update booking status', err);
+      alert(err.response?.data?.message || 'Failed to update booking');
+    }
   };
+
+  const refreshServiceBookings = useCallback(async () => {
+    if (!user) return;
+    try {
+      if (user.isVendor) {
+        const vendorId = user.id || user._id;
+        const res = await api.getVendorServiceBookings(vendorId);
+        setServiceBookings(res.data?.bookings || []);
+      } else {
+        const res = await api.getUserServiceBookings();
+        setServiceBookings(res.data || []);
+      }
+    } catch (err) {
+      console.error('Failed to refresh service bookings', err);
+    }
+  }, [user]);
 
   const addOrder = async (orderData) => {
     try {
-      // Call backend to create order
+      for (const item of cart) {
+        try {
+          await api.updateCartItem(item.id, item.quantity);
+        } catch (err) {
+          if (err.response?.status === 404) {
+            await api.addToCart(item.id, item.quantity);
+          } else {
+            throw err;
+          }
+        }
+      }
+
       const response = await api.createOrder(orderData);
       
       // Transform backend response to match frontend structure
@@ -287,13 +486,19 @@ export const AppProvider = ({ children }) => {
     }
   };
 
-  const updateCartQuantity = (productId, size = null, newQuantity) => {
+  const updateCartQuantity = async (productId, size = null, newQuantity) => {
     if (newQuantity < 1) return;
-    setCart((prevCart) =>
-      prevCart.map((item) =>
-        item.id === productId && item.size === size ? { ...item, quantity: newQuantity } : item
-      )
-    );
+    try {
+      await api.updateCartItem(productId, newQuantity);
+      setCart((prevCart) =>
+        prevCart.map((item) =>
+          item.id === productId && item.size === size ? { ...item, quantity: newQuantity } : item
+        )
+      );
+    } catch (err) {
+      console.error('Failed to update cart quantity', err);
+      alert('Failed to update quantity');
+    }
   };
 
   const toggleWishlist = async (product) => {
@@ -339,8 +544,8 @@ export const AppProvider = ({ children }) => {
     <AppContext.Provider value={{ 
       cart, setCart, addToCart, removeFromCart, updateCartQuantity, updateCartItemSize, 
       wishlist, setWishlist, toggleWishlist, removeFromWishlist, 
-      user, setUser, login, logout, 
-      serviceBookings, addServiceBooking, updateServiceBookingStatus,
+      user, setUser, login, logout, authLoading,
+      serviceBookings, addServiceBooking, updateServiceBookingStatus, refreshServiceBookings,
       orders, addOrder,
       products, addProduct, updateProduct, deleteProduct,
       services, addService, updateService, deleteService,

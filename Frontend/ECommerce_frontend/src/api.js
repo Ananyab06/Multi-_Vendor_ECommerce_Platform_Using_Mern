@@ -33,9 +33,17 @@ export const createProduct = (productData) => API.post('/products', productData)
 export const updateProduct = (id, productData) => API.put(`/products/${id}`, productData);
 export const deleteProduct = (id) => API.delete(`/products/${id}`);
 
+// Service listing APIs
+export const fetchServices = () => API.get('/services');
+export const fetchServiceById = (id) => API.get(`/services/${id}`);
+export const createService = (serviceData) => API.post('/services', serviceData);
+export const updateService = (id, serviceData) => API.put(`/services/${id}`, serviceData);
+export const deleteService = (id) => API.delete(`/services/${id}`);
+
 // Cart APIs
 export const getCart = () => API.get('/cart');
 export const addToCart = (productId, quantity) => API.post('/cart/add', { productId, quantity });
+export const updateCartItem = (productId, quantity) => API.put('/cart/update', { productId, quantity });
 export const removeFromCart = (productId) => API.delete('/cart/remove', { data: { productId } });
 export const clearCart = () => API.delete('/cart/clear');
 
@@ -51,5 +59,12 @@ export const getUserOrders = () => API.get('/orders/user');
 export const getVendorOrders = (vendorId) => API.get(`/orders/vendor/${vendorId}`);
 export const getAllOrders = () => API.get('/orders/all');
 export const updateOrderStatus = (orderId, status) => API.put(`/orders/${orderId}/status`, { status });
+
+// Service booking APIs
+export const createServiceBooking = (bookingData) => API.post('/bookings', bookingData);
+export const getUserServiceBookings = () => API.get('/bookings/user');
+export const getVendorServiceBookings = (vendorId) => API.get(`/bookings/vendor/${vendorId}`);
+export const updateServiceBookingStatus = (bookingId, status) =>
+  API.patch(`/bookings/${bookingId}/status`, { status });
 
 export default API;

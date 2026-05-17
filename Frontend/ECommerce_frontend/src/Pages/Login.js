@@ -37,7 +37,7 @@ const Login = () => {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
-  const { login, user } = useAppContext();
+  const { login, user, authLoading } = useAppContext();
 
   const setAccountType = (type) => {
     if (type === 'vendor') {
@@ -48,12 +48,13 @@ const Login = () => {
   };
 
   useEffect(() => {
+    if (authLoading) return;
     if (user?.isVendor) {
       navigate('/vendor');
     } else if (user) {
       navigate('/');
     }
-  }, [user, navigate]);
+  }, [user, authLoading, navigate]);
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -63,7 +64,7 @@ const Login = () => {
       if (accountType === 'vendor') {
         const response = await loginVendor({ email, password });
         const { token, vendor } = response.data;
-        const vendorWithFlag = { ...vendor, isVendor: true };
+        const vendorWithFlag = { ...vendor, id: vendor.id || vendor._id, isVendor: true };
         login(vendorWithFlag, token);
         navigate('/vendor');
       } else {

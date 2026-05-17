@@ -73,8 +73,7 @@ const Register = () => {
         };
         const response = await registerVendor(vendorData);
         const { token, vendor } = response.data;
-        localStorage.setItem('token', token);
-        login({ ...vendor, isVendor: true }, token);
+        login({ ...vendor, id: vendor.id || vendor._id, isVendor: true }, token);
         navigate('/vendor');
       } else {
         const userData = {

@@ -1,50 +1,64 @@
 import React, { useState } from 'react';
 import { Calendar, CheckCircle2, Star, X } from 'lucide-react';
 import { useAppContext } from '../Context/AppContext';
-import { servicesDB as services } from '../data';
+import { servicesDB } from '../data';
 
 const timeSlots = [
-  "09:00 AM - 11:00 AM",
-  "12:00 PM - 02:00 PM",
-  "03:00 PM - 05:00 PM",
-  "06:00 PM - 08:00 PM"
+  '09:00 AM - 11:00 AM',
+  '12:00 PM - 02:00 PM',
+  '03:00 PM - 05:00 PM',
+  '06:00 PM - 08:00 PM',
 ];
 
 const Services = () => {
   const [bookingModal, setBookingModal] = useState(null);
-  const { serviceBookings, addServiceBooking, services } = useAppContext();
+  const [submitting, setSubmitting] = useState(false);
+  const { serviceBookings, addServiceBooking, services: contextServices, user } = useAppContext();
 
-  // Get today's date in YYYY-MM-DD format
+  const services = contextServices?.length ? contextServices : servicesDB;
   const today = new Date().toISOString().split('T')[0];
 
   const handleBook = (service) => {
+    if (!user || user.isVendor) {
+      alert('Please login as a customer to book a service.');
+      return;
+    }
     setBookingModal(service);
   };
 
-  const confirmBooking = (e) => {
+  const confirmBooking = async (e) => {
     e.preventDefault();
+    if (!user || user.isVendor) {
+      alert('Please login as a customer to book a service.');
+      return;
+    }
+
     const formData = new FormData(e.target);
     const date = formData.get('date');
     const slot = formData.get('slot');
-    
-    addServiceBooking({
-      id: `SRV-${Math.floor(Math.random() * 10000)}`,
-      name: bookingModal.name,
+    const address = formData.get('address');
+
+    setSubmitting(true);
+    const result = await addServiceBooking({
+      serviceName: bookingModal.name,
       vendor: bookingModal.vendor,
       price: bookingModal.price,
       date,
       slot,
-      status: 'Pending',
-      technician: 'Pending Assignment'
+      address,
     });
-    
-    alert(`Successfully booked: ${bookingModal.name} on ${date} at ${slot}! Our technician will contact you shortly.`);
-    setBookingModal(null);
+    setSubmitting(false);
+
+    if (result.success) {
+      alert(
+        `Successfully booked: ${bookingModal.name} on ${date} at ${slot}! Our technician will contact you shortly.`
+      );
+      setBookingModal(null);
+    }
   };
 
   return (
     <div className="space-y-16">
-      {/* Services Hero */}
       <section className="relative rounded-3xl overflow-hidden bg-teal-900 text-white">
         <div className="absolute inset-0">
           <img
@@ -63,24 +77,28 @@ const Services = () => {
         </div>
       </section>
 
-      {/* Services List */}
       <section>
         <div className="mb-8 text-center max-w-3xl mx-auto">
           <h2 className="text-3xl font-bold text-gray-900 mb-4">Our Top Services</h2>
           <p className="text-gray-600">Choose from a wide range of professional services trusted by thousands of customers.</p>
         </div>
-        
+
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
           {services.map((service) => {
-            const isBooked = serviceBookings.find(b => b.name === service.name);
-            
+            const isBooked = serviceBookings.find((b) => b.name === service.name);
+
             return (
               <div key={service.id} className="bg-white rounded-2xl p-4 shadow-sm hover:shadow-xl transition-all duration-300 border border-gray-100 flex flex-col group relative">
                 {isBooked && (
-                  <div className={`absolute top-6 right-6 z-10 px-3 py-1 rounded-full text-xs font-bold shadow-sm flex items-center gap-1 ${
-                    isBooked.status === 'Pending' ? 'bg-amber-100 text-amber-700' : 
-                    isBooked.status === 'Confirmed' ? 'bg-teal-100 text-teal-700' : 'bg-emerald-100 text-emerald-700'
-                  }`}>
+                  <div
+                    className={`absolute top-6 right-6 z-10 px-3 py-1 rounded-full text-xs font-bold shadow-sm flex items-center gap-1 ${
+                      isBooked.status === 'Pending'
+                        ? 'bg-amber-100 text-amber-700'
+                        : isBooked.status === 'Confirmed'
+                        ? 'bg-teal-100 text-teal-700'
+                        : 'bg-emerald-100 text-emerald-700'
+                    }`}
+                  >
                     <CheckCircle2 className="h-3 w-3" /> {isBooked.status}
                   </div>
                 )}
@@ -109,7 +127,7 @@ const Services = () => {
                         Booked
                       </span>
                     ) : (
-                      <button 
+                      <button
                         onClick={() => handleBook(service)}
                         className="flex items-center gap-2 bg-teal-600 text-white px-4 py-2 rounded-full text-sm font-bold hover:bg-teal-700 transition-colors"
                       >
@@ -123,11 +141,11 @@ const Services = () => {
           })}
         </div>
       </section>
-      {/* Booking Modal */}
+
       {bookingModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl p-8 w-full max-w-md relative">
-            <button 
+            <button
               onClick={() => setBookingModal(null)}
               className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 bg-gray-50 hover:bg-gray-100 p-2 rounded-full transition-colors"
             >
@@ -135,33 +153,45 @@ const Services = () => {
             </button>
             <h3 className="text-2xl font-bold text-gray-900 mb-2">Book Service</h3>
             <p className="text-indigo-600 font-semibold mb-6">{bookingModal.name}</p>
-            
+
             <form onSubmit={confirmBooking} className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Preferred Date</label>
-                <input 
-                  type="date" 
+                <input
+                  type="date"
                   name="date"
-                  required 
+                  required
                   min={today}
-                  className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-500 outline-none" 
+                  className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-500 outline-none"
                 />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Time Slot</label>
                 <select name="slot" required className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-500 outline-none">
                   <option value="">Select a time slot</option>
-                  {timeSlots.map(slot => (
-                    <option key={slot} value={slot}>{slot}</option>
+                  {timeSlots.map((slot) => (
+                    <option key={slot} value={slot}>
+                      {slot}
+                    </option>
                   ))}
                 </select>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Address</label>
-                <textarea required rows="3" className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-500 outline-none placeholder-gray-400" placeholder="Enter your full address"></textarea>
+                <textarea
+                  name="address"
+                  required
+                  rows="3"
+                  className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-500 outline-none placeholder-gray-400"
+                  placeholder="Enter your full address"
+                />
               </div>
-              <button type="submit" className="w-full bg-teal-600 hover:bg-teal-700 text-white font-bold py-3 rounded-xl transition-colors mt-4">
-                Confirm Booking
+              <button
+                type="submit"
+                disabled={submitting}
+                className="w-full bg-teal-600 hover:bg-teal-700 text-white font-bold py-3 rounded-xl transition-colors mt-4 disabled:opacity-50"
+              >
+                {submitting ? 'Booking...' : 'Confirm Booking'}
               </button>
             </form>
           </div>
@@ -172,4 +202,3 @@ const Services = () => {
 };
 
 export default Services;
-

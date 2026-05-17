@@ -5,11 +5,13 @@ import {
 } from 'lucide-react';
 import { useAppContext } from '../Context/AppContext';
 import { useNavigate } from 'react-router-dom';
+import { getVendorOrders } from '../api';
 
 const VendorDashboard = () => {
   const { 
     orders: globalOrders, 
-    user: currentUser, 
+    user: currentUser,
+    authLoading,
     logout,
     products, 
     addProduct,
@@ -18,6 +20,7 @@ const VendorDashboard = () => {
     services, 
     serviceBookings,
     updateServiceBookingStatus,
+    refreshServiceBookings,
     addService,
     updateService, 
     deleteService,
@@ -25,50 +28,65 @@ const VendorDashboard = () => {
   } = useAppContext();
   const navigate = useNavigate();
 
-  // Authorization Guard
+  // Authorization Guard (wait until session restore finishes)
   useEffect(() => {
+    if (authLoading) return;
     if (!currentUser || !currentUser.isVendor) {
       navigate('/');
     }
-  }, [currentUser, navigate]);
+  }, [currentUser, authLoading, navigate]);
 
-  // Fetch vendor orders
-  useEffect(() => {
-    if (currentUser && currentUser.isVendor && currentUser._id) {
-      const fetchVendorOrders = async () => {
-        try {
-          const response = await fetch(`http://localhost:5000/api/orders/vendor/${currentUser._id}`, {
-            headers: {
-              'Authorization': `Bearer ${localStorage.getItem('token')}`
-            }
-          });
-          if (response.ok) {
-            const data = await response.json();
-            // Transform backend orders to match frontend structure
-            const transformedOrders = data.map(order => ({
-              id: order._id,
-              date: new Date(order.createdAt).toISOString().split('T')[0],
-              items: order.items.map(item => ({
-                id: item.productId._id || item.productId,
-                name: item.name,
-                price: item.price,
-                qty: item.qty,
-                size: item.size,
-                vendor: item.vendor,
-              })),
-              total: order.totalAmount,
-              status: order.status,
-              customer: order.userId.name || 'Unknown Customer',
-            }));
-            setVendorOrders(transformedOrders);
-          }
-        } catch (error) {
-          console.error('Failed to fetch vendor orders:', error);
-        }
-      };
-      fetchVendorOrders();
+  const [vendorStats, setVendorStats] = useState({ totalRevenue: 0, orderCount: 0 });
+  const [vendorOrders, setVendorOrders] = useState([]);
+
+  const vendorId = (currentUser?.id || currentUser?._id)?.toString();
+
+  const loadVendorOrders = React.useCallback(async () => {
+    if (!currentUser?.isVendor || !vendorId) return;
+
+    try {
+      const response = await getVendorOrders(vendorId);
+      const payload = response.data;
+      const orders = Array.isArray(payload) ? payload : (payload.orders || []);
+      const stats = Array.isArray(payload) ? {} : (payload.stats || {});
+
+      const transformedOrders = orders.map((order) => ({
+        id: order._id,
+        date: new Date(order.createdAt).toISOString().split('T')[0],
+        items: (order.vendorItems || order.items).map((item) => ({
+          id: item.productId?._id || item.productId,
+          name: item.name,
+          price: item.price,
+          qty: item.qty,
+          size: item.size,
+          vendor: item.vendor,
+          vendorId: item.vendorId,
+        })),
+        total: order.vendorOrderTotal ?? order.totalAmount,
+        status: order.status,
+        customer: order.userId?.name || 'Unknown Customer',
+      }));
+
+      setVendorOrders(transformedOrders);
+      setVendorStats({
+        totalRevenue: stats.totalRevenue ?? 0,
+        orderCount: stats.orderCount ?? transformedOrders.length,
+        storeName: stats.storeName,
+      });
+
+      await refreshServiceBookings();
+    } catch (error) {
+      console.error('Failed to fetch vendor orders:', error);
+      const msg = error.response?.data?.message || error.message;
+      if (msg) console.error('Vendor orders API:', msg);
     }
-  }, [currentUser]);
+  }, [currentUser, vendorId, refreshServiceBookings]);
+
+  useEffect(() => {
+    loadVendorOrders();
+    const interval = setInterval(loadVendorOrders, 30000);
+    return () => clearInterval(interval);
+  }, [loadVendorOrders]);
 
   const [activeTab, setActiveTab] = useState('dashboard');
   const [inventorySubTab, setInventorySubTab] = useState('all'); // 'all', 'product', 'service'
@@ -77,7 +95,6 @@ const VendorDashboard = () => {
   const [isAddingItem, setIsAddingItem] = useState(false);
   const [activeToast, setActiveToast] = useState(null);
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth()); // 0-11
-  const [vendorOrders, setVendorOrders] = useState([]);
 
   const prevOrdersCount = useRef(globalOrders.length);
 
@@ -102,17 +119,32 @@ const VendorDashboard = () => {
     }
   }, [currentUser]);
 
+  const belongsToVendor = (item) => {
+    const vendorName = profile.storeName?.toLowerCase().trim();
+    if (item.vendorId && vendorId) {
+      return item.vendorId.toString() === vendorId;
+    }
+    return item.vendor?.toLowerCase().trim() === vendorName;
+  };
+
   // Combine products and services for inventory view using useMemo for reactivity
   const inventory = React.useMemo(() => {
-    const vendorName = profile.storeName?.toLowerCase().trim();
     let items = [
-      ...products.filter(p => p.vendor?.toLowerCase().trim() === vendorName).map(p => ({ ...p, type: 'product', sku: `SKU-${p.id + 50000}` })),
-      ...services.filter(s => s.vendor?.toLowerCase().trim() === vendorName).map(s => ({ ...s, type: 'service', sku: `SRV-${s.id + 100}` }))
+      ...products.filter(belongsToVendor).map((p) => ({
+        ...p,
+        type: 'product',
+        sku: `SKU-${String(p.id).slice(-6).toUpperCase()}`,
+      })),
+      ...services.filter(belongsToVendor).map((s) => ({
+        ...s,
+        type: 'service',
+        sku: `SRV-${String(s.id).slice(-6).toUpperCase()}`,
+      })),
     ];
-    if (inventorySubTab === 'product') return items.filter(i => i.type === 'product');
-    if (inventorySubTab === 'service') return items.filter(i => i.type === 'service');
+    if (inventorySubTab === 'product') return items.filter((i) => i.type === 'product');
+    if (inventorySubTab === 'service') return items.filter((i) => i.type === 'service');
     return items;
-  }, [products, services, inventorySubTab, profile.storeName]);
+  }, [products, services, inventorySubTab, profile.storeName, vendorId]);
 
   const availableCategories = React.useMemo(() => {
     const pCats = products.map(p => p.category);
@@ -126,26 +158,18 @@ const VendorDashboard = () => {
     const vendorProducts = products.filter(p => p.vendor?.toLowerCase().trim() === vendorName);
     const vendorProductNames = new Set(vendorProducts.map(p => p.name));
     
-    // Use vendorOrders instead of filtering globalOrders
-    const vendorProductOrders = vendorOrders.filter(order => 
-      order.items.some(item => 
-        (item.vendor?.toLowerCase().trim() === vendorName) || 
-        vendorProductNames.has(item.name)
-      )
-    );
+    // Orders from API are already scoped to this vendor
+    const vendorProductOrders = vendorOrders;
 
-    // Calculate total revenue from this vendor's products
-    const productRevenue = vendorProductOrders.reduce((sum, order) => {
-      const vendorItems = order.items.filter(item => 
-        (item.vendor?.toLowerCase().trim() === vendorName) || 
-        vendorProductNames.has(item.name)
-      );
-      return sum + vendorItems.reduce((iSum, item) => iSum + ((Number(item.price) || 0) * (Number(item.qty) || 1)), 0);
-    }, 0);
+    const productRevenue =
+      vendorStats.totalRevenue > 0
+        ? vendorStats.totalRevenue
+        : vendorProductOrders.reduce(
+            (sum, order) => sum + (Number(order.total) || 0),
+            0
+          );
 
-    const vendorBookings = serviceBookings.filter(booking => 
-      booking.vendor?.toLowerCase().trim() === vendorName
-    );
+    const vendorBookings = serviceBookings;
     const serviceRevenue = vendorBookings.reduce((sum, booking) => sum + (Number(booking.price) || 0), 0);
 
     const revenue = productRevenue + serviceRevenue;
@@ -162,14 +186,8 @@ const VendorDashboard = () => {
       
       // Get product revenue for this day
       const dailyProductRevenue = vendorProductOrders
-        .filter(order => order.date === dateStr)
-        .reduce((sum, order) => {
-          const vItems = order.items.filter(item => 
-            (item.vendor?.toLowerCase().trim() === vendorName) || 
-            vendorProductNames.has(item.name)
-          );
-          return sum + vItems.reduce((iSum, item) => iSum + ((Number(item.price) || 0) * (Number(item.qty) || 1)), 0);
-        }, 0);
+        .filter((order) => order.date === dateStr)
+        .reduce((sum, order) => sum + (Number(order.total) || 0), 0);
 
       // Get service revenue for this day
       const dailyServiceRevenue = vendorBookings
@@ -190,7 +208,7 @@ const VendorDashboard = () => {
 
     return {
       revenue: `₹${revenue.toLocaleString()}`,
-      orders: (vendorProductOrders.length + vendorBookings.length).toLocaleString(),
+      orders: (vendorStats.orderCount || vendorProductOrders.length + vendorBookings.length).toLocaleString(),
       visitors: visitors.toLocaleString(),
       revenueTrend: revenue > 0 ? "↑ 100%" : "0%",
       ordersTrend: (vendorProductOrders.length + vendorBookings.length) > 0 ? "↑ 100%" : "0%",
@@ -201,7 +219,7 @@ const VendorDashboard = () => {
       chartData,
       maxDailyRevenue
     };
-  }, [globalOrders, products, profile.storeName, selectedMonth, serviceBookings]);
+  }, [vendorOrders, vendorStats, products, profile.storeName, selectedMonth, serviceBookings]);
 
   const handleLogout = () => {
     logout();
@@ -265,19 +283,21 @@ const VendorDashboard = () => {
             vendor: profile.storeName
           });
         } else {
-          addService({
+          await addService({
             ...itemData,
             rating: itemData.rating || 4.8,
             reviews: itemData.reviews || 0,
             image: itemData.image || 'https://images.unsplash.com/photo-1581092921461-eab62e92c859?w=500&q=80',
-            vendor: profile.storeName
+            vendor: profile.storeName,
+            category: itemData.category || 'Services',
+            description: itemData.description || '',
           });
         }
       } else {
         if (itemData.type === 'product') {
           await updateProduct(itemData);
         } else {
-          updateService(itemData);
+          await updateService(itemData);
         }
       }
       setEditingItem(null);
@@ -311,7 +331,7 @@ const VendorDashboard = () => {
         if (item.type === 'product') {
           await deleteProduct(item.id);
         } else {
-          deleteService(item.id);
+          await deleteService(item.id);
         }
       } catch (err) {
         console.error('Failed to delete item', err);
@@ -839,22 +859,20 @@ const VendorDashboard = () => {
                     </thead>
                     <tbody className="divide-y divide-slate-50">
                       {stats.vendorOrders.length > 0 ? stats.vendorOrders.map(order => {
-                        const vendorItems = order.items.filter(item => 
-                          item.vendor === profile.storeName || products.some(p => p.name === item.name && p.vendor === profile.storeName)
-                        );
-                        const vendorTotal = vendorItems.reduce((sum, item) => sum + (item.price * item.qty), 0);
+                        const vendorItems = order.items;
+                        const vendorTotal = Number(order.total) || vendorItems.reduce((sum, item) => sum + (item.price * item.qty), 0);
                         
                         return (
                           <tr key={order.id} className="hover:bg-slate-50/50 transition-colors">
-                            <td className="px-8 py-6 text-sm font-black text-indigo-600 tracking-tight">{order.id}</td>
+                            <td className="px-8 py-6 text-sm font-black text-indigo-600 tracking-tight">{String(order.id).slice(-8).toUpperCase()}</td>
                             <td className="px-8 py-6">
                               <p className="font-bold text-slate-900">{vendorItems[0]?.name || 'Direct Sale'}</p>
-                              <p className="text-xs font-medium text-slate-400">{vendorItems.length} items from your store</p>
+                              <p className="text-xs font-medium text-slate-400">{vendorItems.length} item(s) · {order.customer}</p>
                             </td>
                             <td className="px-8 py-6">
-                              <span className="px-3 py-1 bg-amber-100 text-amber-700 rounded-full text-[10px] font-black uppercase">Processing</span>
+                              <span className="px-3 py-1 bg-amber-100 text-amber-700 rounded-full text-[10px] font-black uppercase capitalize">{order.status || 'processing'}</span>
                             </td>
-                            <td className="px-8 py-6 text-sm font-black text-slate-900">₹{vendorTotal.toFixed(2)}</td>
+                            <td className="px-8 py-6 text-sm font-black text-slate-900">₹{(order.total ?? vendorTotal).toFixed(2)}</td>
                             <td className="px-8 py-6 text-sm font-medium text-slate-500">{order.date}</td>
                           </tr>
                         );

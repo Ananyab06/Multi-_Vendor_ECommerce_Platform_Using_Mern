@@ -2,69 +2,79 @@ const Order = require('../models/Order');
 const Cart = require('../models/Cart');
 const Product = require('../models/Product');
 const Vendor = require('../models/Vendor');
+require('../models/User'); // required for populate('userId')
+const mongoose = require('mongoose');
+
+const getVendorDisplayName = (vendorDoc) => {
+  if (!vendorDoc) return 'Unknown Vendor';
+  return vendorDoc.storeName || vendorDoc.name || 'Unknown Vendor';
+};
 
 // Create a new order from cart
 exports.createOrder = async (req, res) => {
   try {
     const { shippingAddress, paymentMethod = 'cash_on_delivery' } = req.body;
 
-    // Get user's cart
-    const cart = await Cart.findOne({ userId: req.user.id }).populate('items.productId');
+    const cart = await Cart.findOne({ userId: req.user.id }).populate({
+      path: 'items.productId',
+      populate: { path: 'vendorId', select: 'storeName name' },
+    });
+
     if (!cart || cart.items.length === 0) {
       return res.status(400).json({ message: 'Cart is empty' });
     }
 
-    // Calculate total amount and prepare order items
     let totalAmount = 0;
     const orderItems = [];
 
     for (const cartItem of cart.items) {
       const product = cartItem.productId;
       if (!product) {
-        return res.status(404).json({ message: `Product not found for item ${cartItem.productId}` });
+        return res.status(404).json({ message: 'Product not found in cart' });
       }
 
-      // Convert to numbers for proper calculations (use 'quantity' field from Cart model)
       const currentStock = Number(product.stock) || 0;
       const requestedQty = Number(cartItem.quantity) || 0;
       const productPrice = Number(product.price) || 0;
 
-      // Check stock availability
       if (currentStock < requestedQty) {
         return res.status(400).json({
-          message: `Insufficient stock for ${product.name}. Available: ${currentStock}, Requested: ${requestedQty}`
+          message: `Insufficient stock for ${product.name}. Available: ${currentStock}, Requested: ${requestedQty}`,
         });
       }
 
-      const itemTotal = productPrice * requestedQty;
-      totalAmount += itemTotal;
+      const vendorDoc = product.vendorId;
+      if (!vendorDoc || !vendorDoc._id) {
+        return res.status(400).json({ message: `Vendor not found for product ${product.name}` });
+      }
+
+      totalAmount += productPrice * requestedQty;
 
       orderItems.push({
         productId: product._id,
         name: product.name,
         price: productPrice,
         qty: requestedQty,
-        size: cartItem.size,
-        vendor: product.vendor || 'Unknown Vendor',
+        size: cartItem.size || null,
+        vendor: getVendorDisplayName(vendorDoc),
+        vendorId: vendorDoc._id,
       });
 
-      // Decrease product stock with proper number conversion
       product.stock = Math.max(0, currentStock - requestedQty);
       await product.save();
     }
 
-    // Create the order
     const order = new Order({
       userId: req.user.id,
       items: orderItems,
       totalAmount,
       shippingAddress,
       paymentMethod,
+      status: 'processing',
     });
 
     await order.save();
 
-    // Clear the cart after successful order
     cart.items = [];
     await cart.save();
 
@@ -76,7 +86,7 @@ exports.createOrder = async (req, res) => {
         totalAmount,
         status: order.status,
         createdAt: order.createdAt,
-      }
+      },
     });
   } catch (err) {
     console.error('Error creating order:', err);
@@ -98,7 +108,7 @@ exports.getUserOrders = async (req, res) => {
   }
 };
 
-// Get all orders (for admin/vendor management)
+// Get all orders (for admin)
 exports.getAllOrders = async (req, res) => {
   try {
     const orders = await Order.find()
@@ -113,27 +123,84 @@ exports.getAllOrders = async (req, res) => {
   }
 };
 
-// Get orders for a specific vendor
+// Get orders for a specific vendor (matches by product ownership — works for legacy orders too)
 exports.getVendorOrders = async (req, res) => {
   try {
-    const vendorId = req.params.vendorId;
+    const { vendorId } = req.params;
 
-    // Find vendor to get their store name
-    const Vendor = require('../models/Vendor');
+    if (!mongoose.Types.ObjectId.isValid(vendorId)) {
+      return res.status(400).json({ message: 'Invalid vendor ID' });
+    }
+
     const vendor = await Vendor.findById(vendorId);
     if (!vendor) {
       return res.status(404).json({ message: 'Vendor not found' });
     }
 
-    // Find orders containing this vendor's products
+    const vendorProductIds = await Product.find({ vendorId }).distinct('_id');
+    const vendorProductIdSet = new Set(vendorProductIds.map((id) => id.toString()));
+
+    if (vendorProductIdSet.size === 0) {
+      return res.json({
+        orders: [],
+        stats: { totalRevenue: 0, orderCount: 0, storeName: vendor.storeName },
+      });
+    }
+
     const orders = await Order.find({
-      'items.vendor': vendor.companyName || vendor.storeName
+      'items.productId': { $in: vendorProductIds },
     })
       .populate('userId', 'name email')
       .populate('items.productId')
       .sort({ createdAt: -1 });
 
-    res.json(orders);
+    let totalRevenue = 0;
+    const ordersWithVendorTotals = [];
+
+    for (const order of orders) {
+      const vendorItems = order.items.filter((item) => {
+        const productRef = item.productId?._id || item.productId;
+        return productRef && vendorProductIdSet.has(productRef.toString());
+      });
+
+      if (vendorItems.length === 0) continue;
+
+      const vendorOrderTotal = vendorItems.reduce(
+        (sum, item) => sum + (Number(item.price) || 0) * (Number(item.qty) || 0),
+        0
+      );
+      totalRevenue += vendorOrderTotal;
+
+      // Backfill legacy order lines missing vendorId / wrong vendor name
+      let orderUpdated = false;
+      for (const item of order.items) {
+        const productRef = item.productId?._id || item.productId;
+        if (!productRef || !vendorProductIdSet.has(productRef.toString())) continue;
+        if (!item.vendorId || item.vendor === 'Unknown Vendor') {
+          item.vendorId = vendor._id;
+          item.vendor = vendor.storeName;
+          orderUpdated = true;
+        }
+      }
+      if (orderUpdated) {
+        await order.save();
+      }
+
+      ordersWithVendorTotals.push({
+        ...order.toObject(),
+        vendorItems,
+        vendorOrderTotal,
+      });
+    }
+
+    res.json({
+      orders: ordersWithVendorTotals,
+      stats: {
+        totalRevenue,
+        orderCount: ordersWithVendorTotals.length,
+        storeName: vendor.storeName,
+      },
+    });
   } catch (err) {
     console.error('Error fetching vendor orders:', err);
     res.status(500).json({ message: 'Server error' });
