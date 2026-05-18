@@ -2,7 +2,6 @@ import React, { useMemo } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import { Star, ShoppingCart, Heart, Calendar } from 'lucide-react';
 import { useAppContext } from '../Context/AppContext';
-import { productsDB, servicesDB } from '../data';
 
 const Search = () => {
   const [searchParams] = useSearchParams();

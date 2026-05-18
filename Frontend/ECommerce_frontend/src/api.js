@@ -26,6 +26,12 @@ export const registerVendor = (vendorData) => API.post('/vendor/register', vendo
 export const loginVendor = (credentials) => API.post('/vendor/login', credentials);
 export const getCurrentVendor = () => API.get('/vendor/me');
 
+// Upload APIs
+export const uploadImage = (formData) =>
+  API.post('/upload/image', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+
 // Product APIs
 export const fetchProducts = () => API.get('/products');
 export const fetchProductById = (id) => API.get(`/products/${id}`);

@@ -14,6 +14,11 @@ import Search from './Pages/Search';
 import VendorDashboard from './Pages/VendorDashboard';
 import VendorLogin from './Pages/VendorLogin';
 import VendorRegister from './Pages/VendorRegister';
+import ShippingPolicy from './Pages/ShippingPolicy';
+import ReturnsExchanges from './Pages/ReturnsExchanges';
+import FAQs from './Pages/FAQs';
+import PrivacyPolicy from './Pages/PrivacyPolicy';
+import TermsOfService from './Pages/TermsOfService';
 import ScrollToTop from './Components/ScrollToTop';
 import { AppProvider } from './Context/AppContext';
 
@@ -40,6 +45,11 @@ function App() {
                 <Route path="/vendor" element={<VendorDashboard />} />
                 <Route path="/vendor-login" element={<VendorLogin />} />
                 <Route path="/vendor-register" element={<VendorRegister />} />
+                <Route path="/shipping-policy" element={<ShippingPolicy />} />
+                <Route path="/returns-exchanges" element={<ReturnsExchanges />} />
+                <Route path="/faqs" element={<FAQs />} />
+                <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+                <Route path="/terms-of-service" element={<TermsOfService />} />
               </Routes>
             </div>
           </main>

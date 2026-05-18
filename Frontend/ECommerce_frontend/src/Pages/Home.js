@@ -15,12 +15,10 @@ const categories = [
 ];
 
 const Home = () => {
-  const { addToCart, toggleWishlist, wishlist, products, services, user } = useAppContext();
-  const [activeTab, setActiveTab] = React.useState('products');
+  const { addToCart, toggleWishlist, wishlist, products, user } = useAppContext();
   const sliderRef = useRef(null);
   
   const featuredProducts = products.slice(0, 5);
-  const topServices = services.slice(0, 4);
 
   const scrollLeft = () => {
     sliderRef.current.scrollBy({ left: -300, behavior: 'smooth' });
@@ -54,7 +52,7 @@ const Home = () => {
           </p>
           {!user?.isVendor && (
             <div className="mt-10 flex gap-4">
-              <a href="#products" className="inline-flex items-center justify-center px-8 py-3 border border-transparent text-base font-medium rounded-full text-indigo-900 bg-white hover:bg-indigo-50 transition-colors shadow-lg hover:shadow-xl">
+              <a href="#featured-products" className="inline-flex items-center justify-center px-8 py-3 border border-transparent text-base font-medium rounded-full text-indigo-900 bg-white hover:bg-indigo-50 transition-colors shadow-lg hover:shadow-xl">
                 Shop Now
               </a>
               <Link to="/services" className="inline-flex items-center justify-center px-8 py-3 border-2 border-white text-base font-medium rounded-full text-white hover:bg-white/10 transition-colors">
@@ -87,7 +85,7 @@ const Home = () => {
         </div>
         <div ref={sliderRef} className="flex gap-6 overflow-x-auto snap-x snap-mandatory scrollbar-hide pb-4" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
           {categories.map((category) => (
-            <Link to={`/category/${category.name}`} key={category.name} className="flex-none w-64 snap-start group relative rounded-2xl overflow-hidden cursor-pointer shadow-md hover:shadow-xl transition-all duration-300">
+            <Link to={`/category/${encodeURIComponent(category.name)}`} key={category.name} className="flex-none w-64 snap-start group relative rounded-2xl overflow-hidden cursor-pointer shadow-md hover:shadow-xl transition-all duration-300">
               <div className="aspect-w-3 aspect-h-4">
                 <img src={category.image} alt={category.name} className="w-full h-80 object-cover group-hover:scale-105 transition-transform duration-500" />
               </div>
@@ -116,6 +114,12 @@ const Home = () => {
           </Link>
         </div>
 
+        {featuredProducts.length === 0 ? (
+          <div className="text-center py-16 bg-white rounded-2xl border border-gray-100">
+            <p className="text-lg font-semibold text-gray-900 mb-2">No products available yet</p>
+            <p className="text-gray-500">Check back soon — vendors are adding new listings.</p>
+          </div>
+        ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
           {featuredProducts.map((product) => {
             const isWishlisted = wishlist.some(item => item.id === product.id);
@@ -158,6 +162,7 @@ const Home = () => {
             );
           })}
         </div>
+        )}
       </section>
 
     </div>

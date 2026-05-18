@@ -1,5 +1,4 @@
 import React, { createContext, useState, useContext, useEffect, useCallback } from 'react';
-import { productsDB, servicesDB } from '../data';
 import * as api from '../api';
 
 const AppContext = createContext();
@@ -11,8 +10,8 @@ export const AppProvider = ({ children }) => {
   const [authLoading, setAuthLoading] = useState(true);
   const [serviceBookings, setServiceBookings] = useState([]);
   const [orders, setOrders] = useState([]);
-  const [products, setProducts] = useState(Object.values(productsDB));
-  const [services, setServices] = useState(servicesDB);
+  const [products, setProducts] = useState([]);
+  const [services, setServices] = useState([]);
   const [loading, setLoading] = useState(false);
 
   // Restore login session from token after page refresh
@@ -93,7 +92,7 @@ export const AppProvider = ({ children }) => {
           setServices(servicesRes.data);
         }
       } catch (err) {
-        console.error('Failed to fetch catalog from backend, using local data', err);
+        console.error('Failed to fetch catalog from backend', err);
       } finally {
         setLoading(false);
       }
@@ -199,23 +198,12 @@ export const AppProvider = ({ children }) => {
       delete productData.id;
       
       const response = await api.createProduct(productData);
-      const createdProduct = response.data;
-      // Transform backend product to frontend shape
-      const frontendProduct = {
-        id: createdProduct._id,
-        name: createdProduct.name,
-        price: createdProduct.price,
-        image: createdProduct.image,
-        category: createdProduct.category,
-        description: createdProduct.description,
-        rating: createdProduct.rating || 4.5,
-        reviews: createdProduct.reviews || 0,
-        stock: createdProduct.stock || 0,
-        sizes: createdProduct.sizes || [],
-        vendor: user?.companyName || user?.storeName || 'Vendor'
-      };
-      setProducts(prev => [...prev, frontendProduct]);
-      return frontendProduct;
+      const createdProduct = response.data.product;
+      if (!createdProduct) {
+        throw new Error('Invalid response from server');
+      }
+      setProducts(prev => [...prev, createdProduct]);
+      return createdProduct;
     } catch (err) {
       console.error('Failed to add product', err);
       alert('Failed to add product');
@@ -231,23 +219,12 @@ export const AppProvider = ({ children }) => {
       delete productData.id;
       
       const response = await api.updateProduct(productId, productData);
-      const updated = response.data;
-      // Transform backend product to frontend shape
-      const frontendProduct = {
-        id: updated._id,
-        name: updated.name,
-        price: updated.price,
-        image: updated.image,
-        category: updated.category,
-        description: updated.description,
-        rating: updated.rating || 4.5,
-        reviews: updated.reviews || 0,
-        stock: updated.stock || 0,
-        sizes: updated.sizes || [],
-        vendor: user?.companyName || user?.storeName || 'Vendor'
-      };
-      setProducts(prev => prev.map(p => p.id === productId ? frontendProduct : p));
-      return frontendProduct;
+      const updated = response.data.product;
+      if (!updated) {
+        throw new Error('Invalid response from server');
+      }
+      setProducts(prev => prev.map(p => p.id === productId ? updated : p));
+      return updated;
     } catch (err) {
       console.error('Failed to update product', err);
       alert('Failed to update product');

@@ -1,4 +1,3 @@
-
 const Vendor = require('../models/Vendor');
 const jwt = require('jsonwebtoken');
 

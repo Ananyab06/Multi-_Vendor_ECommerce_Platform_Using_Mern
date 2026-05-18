@@ -3,6 +3,160 @@ import { Trash2, CreditCard, MapPin, CheckCircle, Truck, Wallet } from 'lucide-r
 import { useAppContext } from '../Context/AppContext';
 import { useNavigate } from 'react-router-dom';
 
+const initialAddressForm = { name: '', street: '', city: '', state: '', zip: '' };
+const initialPaymentForm = { cardNumber: '', expiryDate: '', cvv: '', upiId: '' };
+
+const formatCardNumber = (value) => {
+  const digits = value.replace(/\D/g, '').slice(0, 16);
+  return digits.replace(/(\d{4})(?=\d)/g, '$1 ').trim();
+};
+
+const formatExpiryDate = (value) => {
+  const digits = value.replace(/\D/g, '').slice(0, 4);
+  if (digits.length <= 2) return digits;
+  return `${digits.slice(0, 2)}/${digits.slice(2)}`;
+};
+
+const validatePaymentForm = (method, data) => {
+  const errors = {};
+
+  if (method === 'cc') {
+    const cardDigits = data.cardNumber.replace(/\s/g, '');
+    if (!cardDigits) {
+      errors.cardNumber = 'Card number is required';
+    } else if (!/^\d{16}$/.test(cardDigits)) {
+      errors.cardNumber = 'Enter a valid 16-digit card number';
+    }
+
+    const expiry = data.expiryDate.trim();
+    if (!expiry) {
+      errors.expiryDate = 'Expiry date is required';
+    } else if (!/^(0[1-9]|1[0-2])\/\d{2}$/.test(expiry)) {
+      errors.expiryDate = 'Use MM/YY format';
+    } else {
+      const [month, year] = expiry.split('/').map(Number);
+      const expiryEnd = new Date(2000 + year, month, 0, 23, 59, 59);
+      if (expiryEnd < new Date()) {
+        errors.expiryDate = 'Card has expired';
+      }
+    }
+
+    const cvv = data.cvv.trim();
+    if (!cvv) {
+      errors.cvv = 'CVV is required';
+    } else if (!/^\d{3,4}$/.test(cvv)) {
+      errors.cvv = 'Enter a valid 3 or 4-digit CVV';
+    }
+  }
+
+  if (method === 'upi') {
+    const upiId = data.upiId.trim();
+    if (!upiId) {
+      errors.upiId = 'UPI ID is required';
+    } else if (!/^[a-zA-Z0-9._-]{2,256}@[a-zA-Z][a-zA-Z0-9.-]{1,63}$/.test(upiId)) {
+      errors.upiId = 'Enter a valid UPI ID (e.g. username@bank)';
+    }
+  }
+
+  return errors;
+};
+
+const validateAddressForm = (data) => {
+  const errors = {};
+  const name = data.name.trim();
+  const street = data.street.trim();
+  const city = data.city.trim();
+  const state = data.state.trim();
+  const zip = data.zip.trim();
+
+  if (!name) {
+    errors.name = 'Full name is required';
+  } else if (name.length < 2) {
+    errors.name = 'Name must be at least 2 characters';
+  } else if (!/^[a-zA-Z\s.'-]+$/.test(name)) {
+    errors.name = 'Name can only contain letters';
+  }
+
+  if (!street) {
+    errors.street = 'Street address is required';
+  } else if (street.length < 5) {
+    errors.street = 'Enter a complete street address (min. 5 characters)';
+  } else if (!/[a-zA-Z]/.test(street) || !/\d/.test(street)) {
+    errors.street = 'Include house/building number and street name';
+  }
+
+  if (!city) {
+    errors.city = 'City is required';
+  } else if (city.length < 2) {
+    errors.city = 'City must be at least 2 characters';
+  } else if (!/^[a-zA-Z\s]+$/.test(city)) {
+    errors.city = 'City can only contain letters';
+  }
+
+  if (!state) {
+    errors.state = 'State is required';
+  } else if (state.length < 2) {
+    errors.state = 'State must be at least 2 characters';
+  } else if (!/^[a-zA-Z\s]+$/.test(state)) {
+    errors.state = 'State can only contain letters';
+  }
+
+  if (!zip) {
+    errors.zip = 'PIN code is required';
+  } else if (!/^[1-9][0-9]{5}$/.test(zip)) {
+    errors.zip = 'Enter a valid 6-digit PIN code';
+  }
+
+  return errors;
+};
+
+const PaymentField = ({ label, name, value, onChange, error, placeholder, className = '', ...inputProps }) => (
+  <div>
+    <label htmlFor={name} className="block text-sm font-medium text-gray-700">{label}</label>
+    <input
+      id={name}
+      name={name}
+      value={value}
+      onChange={onChange}
+      placeholder={placeholder}
+      aria-invalid={Boolean(error)}
+      aria-describedby={error ? `${name}-error` : undefined}
+      className={`mt-1 w-full p-3 border rounded-lg bg-white transition-colors focus:outline-none focus:ring-2 ${
+        error ? 'border-red-500 focus:ring-red-500' : 'border-gray-200 focus:ring-indigo-500'
+      } ${className}`}
+      {...inputProps}
+    />
+    {error && (
+      <p id={`${name}-error`} className="mt-1 text-sm text-red-600" role="alert">
+        {error}
+      </p>
+    )}
+  </div>
+);
+
+const AddressField = ({ label, name, value, onChange, error, placeholder, ...inputProps }) => (
+  <div>
+    <label htmlFor={name} className="sr-only">{label}</label>
+    <input
+      id={name}
+      name={name}
+      value={value}
+      onChange={onChange}
+      placeholder={placeholder}
+      aria-invalid={Boolean(error)}
+      aria-describedby={error ? `${name}-error` : undefined}
+      className={`w-full p-3 border rounded-xl transition-colors ${
+        error ? 'border-red-500 focus:ring-red-500' : 'border-gray-200 focus:ring-indigo-500'
+      } focus:outline-none focus:ring-2`}
+      {...inputProps}
+    />
+    {error && (
+      <p id={`${name}-error`} className="mt-1 text-sm text-red-600" role="alert">
+        {error}
+      </p>
+    )}
+  </div>
+);
 
 const Cart = () => {
   const { cart, removeFromCart, updateCartQuantity, updateCartItemSize, setCart, addOrder, user, products } = useAppContext();
@@ -12,38 +166,83 @@ const Cart = () => {
   ]);
   const [selectedAddress, setSelectedAddress] = useState(1);
   const [paymentMethod, setPaymentMethod] = useState('cc'); // 'cc', 'upi', 'cod'
+  const [addressForm, setAddressForm] = useState(initialAddressForm);
+  const [addressErrors, setAddressErrors] = useState({});
+  const [paymentForm, setPaymentForm] = useState(initialPaymentForm);
+  const [paymentErrors, setPaymentErrors] = useState({});
   const navigate = useNavigate();
 
   const total = cart.reduce((acc, item) => acc + item.price * item.quantity, 0);
 
+  const handleAddressFieldChange = (e) => {
+    const { name, value } = e.target;
+    const nextValue = name === 'zip' ? value.replace(/\D/g, '').slice(0, 6) : value;
+    setAddressForm((prev) => ({ ...prev, [name]: nextValue }));
+    if (addressErrors[name]) {
+      setAddressErrors((prev) => ({ ...prev, [name]: '' }));
+    }
+  };
+
   const handleAddAddress = (e) => {
     e.preventDefault();
-    const formData = new FormData(e.target);
+    const errors = validateAddressForm(addressForm);
+    if (Object.keys(errors).length > 0) {
+      setAddressErrors(errors);
+      return;
+    }
+
     const newAddr = {
       id: Date.now(),
-      name: formData.get('name'),
-      street: formData.get('street'),
-      city: formData.get('city'),
-      state: formData.get('state'),
-      zip: formData.get('zip'),
+      name: addressForm.name.trim(),
+      street: addressForm.street.trim(),
+      city: addressForm.city.trim(),
+      state: addressForm.state.trim(),
+      zip: addressForm.zip.trim(),
     };
     setAddresses([...addresses, newAddr]);
     setSelectedAddress(newAddr.id);
-    e.target.reset();
+    setAddressForm(initialAddressForm);
+    setAddressErrors({});
+  };
+
+  const handlePaymentFieldChange = (e) => {
+    const { name, value } = e.target;
+    let nextValue = value;
+
+    if (name === 'cardNumber') nextValue = formatCardNumber(value);
+    else if (name === 'expiryDate') nextValue = formatExpiryDate(value);
+    else if (name === 'cvv') nextValue = value.replace(/\D/g, '').slice(0, 4);
+    else if (name === 'upiId') nextValue = value.trim().toLowerCase();
+
+    setPaymentForm((prev) => ({ ...prev, [name]: nextValue }));
+    if (paymentErrors[name]) {
+      setPaymentErrors((prev) => ({ ...prev, [name]: '' }));
+    }
+  };
+
+  const handlePaymentMethodChange = (method) => {
+    setPaymentMethod(method);
+    setPaymentErrors({});
   };
 
   const handleCheckout = async (e) => {
     e.preventDefault();
-    
-    // Simulate payment failure check
-    const formData = new FormData(e.target);
-    const cardNumber = formData.get('cardNumber');
-    
-    if (paymentMethod === 'cc' && cardNumber === '0000 0000 0000 0000') {
-      alert("Payment Failed: Your card was declined. Please try again with a different card.");
+
+    const errors = validatePaymentForm(paymentMethod, paymentForm);
+    if (Object.keys(errors).length > 0) {
+      setPaymentErrors(errors);
+      return;
+    }
+    setPaymentErrors({});
+
+    const cardDigits = paymentForm.cardNumber.replace(/\s/g, '');
+    if (paymentMethod === 'cc' && cardDigits === '0000000000000000') {
+      alert('Payment Failed: Your card was declined. Please try again with a different card.');
       navigate('/');
       return;
     }
+
+    const selectedAddr = addresses.find((addr) => addr.id === selectedAddress);
 
     const newOrder = {
       id: `ORD-${Math.floor(Math.random() * 10000)}`,
@@ -61,16 +260,15 @@ const Cart = () => {
       items: cart.map(i => ({ id: i.id, name: i.name, qty: i.quantity, price: i.price, size: i.size, vendor: i.vendor }))
     };
 
-    // Prepare data for backend API
     const orderData = {
       shippingAddress: {
-        street: formData.get('address') || '',
-        city: formData.get('city') || '',
-        state: formData.get('state') || '',
-        zipCode: formData.get('zipCode') || '',
-        country: 'India'
+        street: selectedAddr?.street || '',
+        city: selectedAddr?.city || '',
+        state: selectedAddr?.state || '',
+        zipCode: selectedAddr?.zip || '',
+        country: 'India',
       },
-      paymentMethod: paymentMethod
+      paymentMethod: paymentMethod,
     };
 
     const result = await addOrder(orderData);
@@ -91,13 +289,21 @@ const Cart = () => {
   }, [checkoutStep, navigate]);
 
   if (checkoutStep === 'success') {
+    const isCashOnDelivery = paymentMethod === 'cod';
+
     return (
       <div className="max-w-xl mx-auto bg-white p-12 rounded-3xl shadow-sm border border-gray-100 mt-16 text-center">
         <div className="w-24 h-24 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
           <CheckCircle className="h-12 w-12 text-green-500" />
         </div>
-        <h2 className="text-3xl font-extrabold text-gray-900 mb-2">Payment Successful!</h2>
-        <p className="text-gray-500 text-lg mb-8">Your order has been placed and is being processed.</p>
+        <h2 className="text-3xl font-extrabold text-gray-900 mb-2">
+          {isCashOnDelivery ? 'Successfully Ordered!' : 'Payment Successful!'}
+        </h2>
+        <p className="text-gray-500 text-lg mb-8">
+          {isCashOnDelivery
+            ? 'Your order has been placed. Pay when your delivery arrives.'
+            : 'Your order has been placed and is being processed.'}
+        </p>
         <p className="text-sm text-gray-400">Redirecting to home page in a few seconds...</p>
       </div>
     );
@@ -112,24 +318,24 @@ const Cart = () => {
           <span>₹{total.toFixed(2)}</span>
         </div>
 
-        <form onSubmit={handleCheckout} className="space-y-8">
+        <form onSubmit={handleCheckout} className="space-y-8" noValidate>
           <div className="space-y-4">
             <h3 className="font-semibold text-gray-900">Select Payment Method</h3>
             
             <label className={`flex items-center p-4 border rounded-xl cursor-pointer transition-colors ${paymentMethod === 'cc' ? 'border-indigo-600 bg-indigo-50/50' : 'hover:bg-gray-50'}`}>
-              <input type="radio" name="paymentMethod" value="cc" checked={paymentMethod === 'cc'} onChange={() => setPaymentMethod('cc')} className="w-4 h-4 text-indigo-600" />
+              <input type="radio" name="paymentMethod" value="cc" checked={paymentMethod === 'cc'} onChange={() => handlePaymentMethodChange('cc')} className="w-4 h-4 text-indigo-600" />
               <CreditCard className="ml-3 h-5 w-5 text-gray-500" />
               <span className="ml-2 font-medium text-gray-900">Credit / Debit Card</span>
             </label>
             
             <label className={`flex items-center p-4 border rounded-xl cursor-pointer transition-colors ${paymentMethod === 'upi' ? 'border-indigo-600 bg-indigo-50/50' : 'hover:bg-gray-50'}`}>
-              <input type="radio" name="paymentMethod" value="upi" checked={paymentMethod === 'upi'} onChange={() => setPaymentMethod('upi')} className="w-4 h-4 text-indigo-600" />
+              <input type="radio" name="paymentMethod" value="upi" checked={paymentMethod === 'upi'} onChange={() => handlePaymentMethodChange('upi')} className="w-4 h-4 text-indigo-600" />
               <Wallet className="ml-3 h-5 w-5 text-gray-500" />
               <span className="ml-2 font-medium text-gray-900">UPI</span>
             </label>
 
             <label className={`flex items-center p-4 border rounded-xl cursor-pointer transition-colors ${paymentMethod === 'cod' ? 'border-indigo-600 bg-indigo-50/50' : 'hover:bg-gray-50'}`}>
-              <input type="radio" name="paymentMethod" value="cod" checked={paymentMethod === 'cod'} onChange={() => setPaymentMethod('cod')} className="w-4 h-4 text-indigo-600" />
+              <input type="radio" name="paymentMethod" value="cod" checked={paymentMethod === 'cod'} onChange={() => handlePaymentMethodChange('cod')} className="w-4 h-4 text-indigo-600" />
               <Truck className="ml-3 h-5 w-5 text-gray-500" />
               <span className="ml-2 font-medium text-gray-900">Cash on Delivery</span>
             </label>
@@ -137,29 +343,53 @@ const Cart = () => {
 
           {paymentMethod === 'cc' && (
             <div className="space-y-4 p-6 border rounded-xl bg-gray-50">
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Card Number</label>
-                <input type="text" name="cardNumber" required placeholder="0000 0000 0000 0000" className="mt-1 w-full p-3 border rounded-lg bg-white" />
-              </div>
+              <PaymentField
+                label="Card Number"
+                name="cardNumber"
+                value={paymentForm.cardNumber}
+                onChange={handlePaymentFieldChange}
+                error={paymentErrors.cardNumber}
+                placeholder="0000 0000 0000 0000"
+                inputMode="numeric"
+                autoComplete="cc-number"
+              />
               <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">Expiry Date</label>
-                  <input type="text" required placeholder="MM/YY" className="mt-1 w-full p-3 border rounded-lg bg-white" />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">CVV</label>
-                  <input type="password" required placeholder="123" className="mt-1 w-full p-3 border rounded-lg bg-white" />
-                </div>
+                <PaymentField
+                  label="Expiry Date"
+                  name="expiryDate"
+                  value={paymentForm.expiryDate}
+                  onChange={handlePaymentFieldChange}
+                  error={paymentErrors.expiryDate}
+                  placeholder="MM/YY"
+                  inputMode="numeric"
+                  autoComplete="cc-exp"
+                />
+                <PaymentField
+                  label="CVV"
+                  name="cvv"
+                  type="password"
+                  value={paymentForm.cvv}
+                  onChange={handlePaymentFieldChange}
+                  error={paymentErrors.cvv}
+                  placeholder="123"
+                  inputMode="numeric"
+                  autoComplete="cc-csc"
+                />
               </div>
             </div>
           )}
 
           {paymentMethod === 'upi' && (
             <div className="space-y-4 p-6 border rounded-xl bg-gray-50">
-              <div>
-                <label className="block text-sm font-medium text-gray-700">UPI ID</label>
-                <input type="text" required placeholder="username@bank" className="mt-1 w-full p-3 border rounded-lg bg-white" />
-              </div>
+              <PaymentField
+                label="UPI ID"
+                name="upiId"
+                value={paymentForm.upiId}
+                onChange={handlePaymentFieldChange}
+                error={paymentErrors.upiId}
+                placeholder="username@bank"
+                autoComplete="off"
+              />
             </div>
           )}
 
@@ -202,14 +432,55 @@ const Cart = () => {
 
         <div className="bg-white p-8 rounded-3xl shadow-sm border border-gray-100 h-fit">
           <h3 className="text-xl font-bold text-gray-900 mb-6">Add New Address</h3>
-          <form onSubmit={handleAddAddress} className="space-y-4">
-            <input type="text" name="name" required placeholder="Full Name" className="w-full p-3 border border-gray-200 rounded-xl" />
-            <input type="text" name="street" required placeholder="Street Address" className="w-full p-3 border border-gray-200 rounded-xl" />
+          <form onSubmit={handleAddAddress} className="space-y-4" noValidate>
+            <AddressField
+              label="Full Name"
+              name="name"
+              value={addressForm.name}
+              onChange={handleAddressFieldChange}
+              error={addressErrors.name}
+              placeholder="Full Name"
+              autoComplete="name"
+            />
+            <AddressField
+              label="Street Address"
+              name="street"
+              value={addressForm.street}
+              onChange={handleAddressFieldChange}
+              error={addressErrors.street}
+              placeholder="Street Address (e.g. 42 MG Road, Apt 3B)"
+              autoComplete="street-address"
+            />
             <div className="grid grid-cols-2 gap-4">
-              <input type="text" name="city" required placeholder="City" className="w-full p-3 border border-gray-200 rounded-xl" />
-              <input type="text" name="state" required placeholder="State" className="w-full p-3 border border-gray-200 rounded-xl" />
+              <AddressField
+                label="City"
+                name="city"
+                value={addressForm.city}
+                onChange={handleAddressFieldChange}
+                error={addressErrors.city}
+                placeholder="City"
+                autoComplete="address-level2"
+              />
+              <AddressField
+                label="State"
+                name="state"
+                value={addressForm.state}
+                onChange={handleAddressFieldChange}
+                error={addressErrors.state}
+                placeholder="State"
+                autoComplete="address-level1"
+              />
             </div>
-            <input type="text" name="zip" required placeholder="ZIP Code" className="w-full p-3 border border-gray-200 rounded-xl" />
+            <AddressField
+              label="PIN Code"
+              name="zip"
+              value={addressForm.zip}
+              onChange={handleAddressFieldChange}
+              error={addressErrors.zip}
+              placeholder="PIN Code"
+              inputMode="numeric"
+              autoComplete="postal-code"
+            />
             <button type="submit" className="w-full py-3 bg-gray-900 text-white rounded-xl font-bold hover:bg-gray-800 transition-colors">Save Address</button>
           </form>
 

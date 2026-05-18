@@ -1,5 +1,5 @@
 import React from 'react';
-import { Globe, MessageCircle, Video, Share2, Mail, Phone, MapPin } from 'lucide-react';
+import { Mail, Phone, MapPin } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 const Footer = () => {
@@ -11,13 +11,7 @@ const Footer = () => {
             <h3 className="text-white text-xl font-bold mb-4">Unibox
 
             </h3>
-            <p className="text-gray-400 mb-6">Your one-stop destination for multivendor products and professional services. Quality guaranteed.</p>
-            <div className="flex space-x-4">
-              <a href="#" className="text-gray-400 hover:text-white transition-colors"><Globe className="h-5 w-5" /></a>
-              <a href="#" className="text-gray-400 hover:text-white transition-colors"><MessageCircle className="h-5 w-5" /></a>
-              <a href="#" className="text-gray-400 hover:text-white transition-colors"><Video className="h-5 w-5" /></a>
-              <a href="#" className="text-gray-400 hover:text-white transition-colors"><Share2 className="h-5 w-5" /></a>
-            </div>
+            <p className="text-gray-400">Your one-stop destination for multivendor products and professional services. Quality guaranteed.</p>
           </div>
 
           <div>
@@ -33,10 +27,9 @@ const Footer = () => {
           <div>
             <h3 className="text-white text-lg font-bold mb-4">Customer Service</h3>
             <ul className="space-y-3">
-              <li><a href="#" className="hover:text-white transition-colors">Contact Us</a></li>
-              <li><a href="#" className="hover:text-white transition-colors">Shipping Policy</a></li>
-              <li><a href="#" className="hover:text-white transition-colors">Returns & Exchanges</a></li>
-              <li><a href="#" className="hover:text-white transition-colors">FAQs</a></li>
+              <li><Link to="/shipping-policy" className="hover:text-white transition-colors">Shipping Policy</Link></li>
+              <li><Link to="/returns-exchanges" className="hover:text-white transition-colors">Returns & Exchanges</Link></li>
+              <li><Link to="/faqs" className="hover:text-white transition-colors">FAQs</Link></li>
             </ul>
           </div>
 
@@ -63,8 +56,8 @@ const Footer = () => {
           <p>&copy; {new Date().getFullYear()} Unibox
             . All rights reserved.</p>
           <div className="flex space-x-6 mt-4 md:mt-0">
-            <a href="#" className="hover:text-white transition-colors">Privacy Policy</a>
-            <a href="#" className="hover:text-white transition-colors">Terms of Service</a>
+            <Link to="/privacy-policy" className="hover:text-white transition-colors">Privacy Policy</Link>
+            <Link to="/terms-of-service" className="hover:text-white transition-colors">Terms of Service</Link>
           </div>
         </div>
       </div>

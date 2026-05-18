@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { Calendar, CheckCircle2, Star, X } from 'lucide-react';
 import { useAppContext } from '../Context/AppContext';
-import { servicesDB } from '../data';
 
 const timeSlots = [
   '09:00 AM - 11:00 AM',
@@ -13,9 +12,7 @@ const timeSlots = [
 const Services = () => {
   const [bookingModal, setBookingModal] = useState(null);
   const [submitting, setSubmitting] = useState(false);
-  const { serviceBookings, addServiceBooking, services: contextServices, user } = useAppContext();
-
-  const services = contextServices?.length ? contextServices : servicesDB;
+  const { serviceBookings, addServiceBooking, services, user } = useAppContext();
   const today = new Date().toISOString().split('T')[0];
 
   const handleBook = (service) => {
@@ -83,6 +80,12 @@ const Services = () => {
           <p className="text-gray-600">Choose from a wide range of professional services trusted by thousands of customers.</p>
         </div>
 
+        {services.length === 0 ? (
+          <div className="text-center py-16 bg-white rounded-2xl border border-gray-100">
+            <p className="text-lg font-semibold text-gray-900 mb-2">No services available yet</p>
+            <p className="text-gray-500">Check back soon — vendors are adding new services.</p>
+          </div>
+        ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
           {services.map((service) => {
             const isBooked = serviceBookings.find((b) => b.name === service.name);
@@ -140,6 +143,7 @@ const Services = () => {
             );
           })}
         </div>
+        )}
       </section>
 
       {bookingModal && (

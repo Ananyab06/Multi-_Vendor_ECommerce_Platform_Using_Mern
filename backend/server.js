@@ -1,4 +1,5 @@
 const express = require('express');
+const path = require('path');
 const mongoose = require('mongoose');
 const dotenv = require('dotenv');
 const cors = require('cors');
@@ -11,7 +12,8 @@ const PORT = process.env.PORT || 5000;
 
 // Middleware
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // MongoDB connection
 mongoose.connect(process.env.MONGODB_URI)
@@ -32,6 +34,7 @@ const wishlistRoutes = require('./routes/wishlist');
 const orderRoutes = require('./routes/order');
 const bookingRoutes = require('./routes/booking');
 const serviceRoutes = require('./routes/service');
+const uploadRoutes = require('./routes/upload');
 
 // Use routes
 app.use('/api/auth', authRoutes);
@@ -42,6 +45,7 @@ app.use('/api/wishlist', wishlistRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/bookings', bookingRoutes);
 app.use('/api/services', serviceRoutes);
+app.use('/api/upload', uploadRoutes);
 
 // Start server
 app.listen(PORT, () => {

@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   LayoutDashboard,Package,ShoppingCart,User,Settings,Bell, Plus,TrendingUp,TrendingDown,DollarSign, 
-  Users,Activity,Edit2,Save,CheckCircle,X,Briefcase,Store,ChevronRight,LogOut,ShoppingBag,Trash2
+  Users,Activity,Edit2,Save,CheckCircle,X,Briefcase,Store,ChevronRight,LogOut,ShoppingBag,Trash2,Upload,ImagePlus
 } from 'lucide-react';
 import { useAppContext } from '../Context/AppContext';
 import { useNavigate } from 'react-router-dom';
-import { getVendorOrders } from '../api';
+import { getVendorOrders, uploadImage } from '../api';
 
 const VendorDashboard = () => {
   const { 
@@ -93,6 +93,9 @@ const VendorDashboard = () => {
   const [notifications, setNotifications] = useState([]);
   const [editingItem, setEditingItem] = useState(null);
   const [isAddingItem, setIsAddingItem] = useState(false);
+  const [imageFile, setImageFile] = useState(null);
+  const [imagePreview, setImagePreview] = useState('');
+  const imageInputRef = useRef(null);
   const [activeToast, setActiveToast] = useState(null);
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth()); // 0-11
 
@@ -266,20 +269,73 @@ const VendorDashboard = () => {
   const [savingItem, setSavingItem] = useState(false);
   const [deletingId, setDeletingId] = useState(null);
 
+  const resetImageSelection = () => {
+    if (imagePreview.startsWith('blob:')) {
+      URL.revokeObjectURL(imagePreview);
+    }
+    setImageFile(null);
+    setImagePreview('');
+    if (imageInputRef.current) {
+      imageInputRef.current.value = '';
+    }
+  };
+
+  const closeItemModal = () => {
+    resetImageSelection();
+    setEditingItem(null);
+    setIsAddingItem(false);
+  };
+
+  const handleImageSelect = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+    if (!allowedTypes.includes(file.type)) {
+      alert('Please upload a JPG, PNG, WEBP, or GIF image.');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      alert('Image must be smaller than 5MB.');
+      return;
+    }
+
+    if (imagePreview.startsWith('blob:')) {
+      URL.revokeObjectURL(imagePreview);
+    }
+    setImageFile(file);
+    setImagePreview(URL.createObjectURL(file));
+  };
+
   const handleSaveItem = async (e) => {
     e.preventDefault();
     const itemData = { ...editingItem };
-    
+
+    const hasImage = Boolean(imageFile || itemData.image);
+    if (!hasImage) {
+      alert('Please upload an image for this listing.');
+      return;
+    }
+
     setSavingItem(true);
     try {
+      let imageUrl = itemData.image;
+      if (imageFile) {
+        const formData = new FormData();
+        formData.append('image', imageFile);
+        const uploadRes = await uploadImage(formData);
+        imageUrl = uploadRes.data.url;
+      }
+      itemData.image = imageUrl;
+
       if (isAddingItem) {
         if (itemData.type === 'product') {
           await addProduct({
             ...itemData,
             rating: itemData.rating || 4.5,
             reviews: itemData.reviews || 0,
-            sizes: [],
-            image: itemData.image || 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=500&q=80',
+            sizes: itemData.sizes || [],
+            image: imageUrl,
             vendor: profile.storeName
           });
         } else {
@@ -287,29 +343,28 @@ const VendorDashboard = () => {
             ...itemData,
             rating: itemData.rating || 4.8,
             reviews: itemData.reviews || 0,
-            image: itemData.image || 'https://images.unsplash.com/photo-1581092921461-eab62e92c859?w=500&q=80',
+            image: imageUrl,
             vendor: profile.storeName,
             category: itemData.category || 'Services',
             description: itemData.description || '',
           });
         }
+      } else if (itemData.type === 'product') {
+        await updateProduct(itemData);
       } else {
-        if (itemData.type === 'product') {
-          await updateProduct(itemData);
-        } else {
-          await updateService(itemData);
-        }
+        await updateService(itemData);
       }
-      setEditingItem(null);
-      setIsAddingItem(false);
+      closeItemModal();
     } catch (err) {
       console.error('Failed to save item', err);
+      alert(err.response?.data?.message || 'Failed to save item. Please try again.');
     } finally {
       setSavingItem(false);
     }
   };
 
   const openAddItemModal = () => {
+    resetImageSelection();
     setEditingItem({
       type: inventorySubTab === 'service' ? 'service' : 'product',
       name: '',
@@ -510,7 +565,7 @@ const VendorDashboard = () => {
             <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden animate-zoom-in max-h-[90vh] flex flex-col">
               <div className="p-6 border-b border-slate-50 flex justify-between items-center bg-indigo-600 text-white flex-shrink-0">
                 <h3 className="text-xl font-black">{isAddingItem ? 'Add New Item' : 'Edit Item'}</h3>
-                <button onClick={() => { setEditingItem(null); setIsAddingItem(false); }} className="p-2 hover:bg-white/10 rounded-full transition-colors">
+                <button type="button" onClick={closeItemModal} className="p-2 hover:bg-white/10 rounded-full transition-colors">
                   <X className="h-6 w-6" />
                 </button>
               </div>
@@ -563,7 +618,7 @@ const VendorDashboard = () => {
                           onChange={(e) => setEditingItem({ ...editingItem, category: e.target.value })}
                           className="w-full px-5 py-3 bg-slate-50 border-none rounded-xl font-bold text-slate-900 focus:ring-2 focus:ring-indigo-500 transition-all"
                         >
-                          {['Electronics', 'Fashion', 'Home & Kitchen', 'Beauty', 'Books', 'Sports', 'Automotive', 'Groceries'].map(cat => (
+                          {['Electronics', 'Fashion', 'Home & Living', 'Beauty', 'Toys', 'Sports', 'Automotive', 'Groceries'].map(cat => (
                             <option key={cat} value={cat}>{cat}</option>
                           ))}
                         </select>
@@ -571,15 +626,59 @@ const VendorDashboard = () => {
                     )}
                   </div>
                   <div>
-                    <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">Image URL</label>
-                    <input 
-                      type="url" 
-                      required
-                      placeholder="https://images.unsplash.com/..."
-                      value={editingItem?.image || ''}
-                      onChange={(e) => setEditingItem({ ...editingItem, image: e.target.value })}
-                      className="w-full px-5 py-3 bg-slate-50 border-none rounded-xl font-bold text-slate-900 focus:ring-2 focus:ring-indigo-500 transition-all" 
-                    />
+                    <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">
+                      {editingItem?.type === 'service' ? 'Service Image' : 'Product Image'}
+                    </label>
+                    <div className="rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50 p-4">
+                      {(imagePreview || editingItem?.image) ? (
+                        <div className="space-y-3">
+                          <img
+                            src={imagePreview || editingItem.image}
+                            alt="Preview"
+                            className="w-full h-48 object-cover rounded-xl border border-slate-200"
+                          />
+                          <div className="flex flex-wrap gap-2">
+                            <button
+                              type="button"
+                              onClick={() => imageInputRef.current?.click()}
+                              className="inline-flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-700 hover:bg-slate-100 transition-colors"
+                            >
+                              <Upload className="h-4 w-4" />
+                              Change Image
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                resetImageSelection();
+                                setEditingItem({ ...editingItem, image: '' });
+                              }}
+                              className="px-4 py-2 text-sm font-bold text-red-600 hover:bg-red-50 rounded-xl transition-colors"
+                            >
+                              Remove
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => imageInputRef.current?.click()}
+                          className="w-full flex flex-col items-center justify-center gap-3 py-10 text-slate-500 hover:text-indigo-600 transition-colors"
+                        >
+                          <div className="p-4 bg-white rounded-2xl shadow-sm">
+                            <ImagePlus className="h-8 w-8 text-indigo-500" />
+                          </div>
+                          <span className="text-sm font-bold">Click to upload image</span>
+                          <span className="text-xs text-slate-400">JPG, PNG, WEBP or GIF · Max 5MB</span>
+                        </button>
+                      )}
+                      <input
+                        ref={imageInputRef}
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp,image/gif"
+                        onChange={handleImageSelect}
+                        className="hidden"
+                      />
+                    </div>
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div>
@@ -643,7 +742,7 @@ const VendorDashboard = () => {
                   </div>
                 </div>
                 <div className="flex gap-4 pt-4 flex-shrink-0">
-                  <button type="button" onClick={() => { setEditingItem(null); setIsAddingItem(false); }} className="flex-1 py-4 bg-slate-100 text-slate-600 rounded-2xl font-black hover:bg-slate-200 transition-all">CANCEL</button>
+                  <button type="button" onClick={closeItemModal} className="flex-1 py-4 bg-slate-100 text-slate-600 rounded-2xl font-black hover:bg-slate-200 transition-all">CANCEL</button>
                   <button type="submit" disabled={savingItem} className="flex-1 py-4 bg-indigo-600 text-white rounded-2xl font-black hover:bg-indigo-700 shadow-xl shadow-indigo-100 transition-all flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed">
                     {savingItem ? (
                       <>
@@ -809,7 +908,11 @@ const VendorDashboard = () => {
                         </td>
                         <td className="px-8 py-6 flex gap-2">
                           <button 
-                            onClick={() => setEditingItem(item)}
+                            onClick={() => {
+                              resetImageSelection();
+                              setIsAddingItem(false);
+                              setEditingItem(item);
+                            }}
                             className="p-2 text-slate-300 hover:text-indigo-600 transition-colors"
                           >
                             <Edit2 className="h-5 w-5" />

@@ -1,25 +1,35 @@
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { Star, ShoppingCart, Heart, Filter } from 'lucide-react';
 import { useAppContext } from '../Context/AppContext';
-import { productsDB } from '../data';
+
+const normalizeCategory = (value) => (value || '').trim().toLowerCase();
 
 const Category = () => {
-  const { name } = useParams();
+  const { name: rawName } = useParams();
+  const categoryName = decodeURIComponent(rawName || '');
   const { addToCart, toggleWishlist, wishlist, products, user } = useAppContext();
-  
-  // Filter state
+
   const [maxPrice, setMaxPrice] = useState(10000);
   const [selectedSize, setSelectedSize] = useState('');
 
-  // Extract products for this category
   const categoryProducts = useMemo(() => {
-    if (name.toLowerCase() === 'all') return products;
-    return products.filter(
-      p => p.category.toLowerCase() === name.toLowerCase()
-    );
-  }, [name, products]);
+    if (normalizeCategory(categoryName) === 'all') return products;
+    const target = normalizeCategory(categoryName);
+    return products.filter((p) => normalizeCategory(p.category) === target);
+  }, [categoryName, products]);
+
+  const priceSliderMax = useMemo(() => {
+    if (categoryProducts.length === 0) return 10000;
+    const highest = Math.max(...categoryProducts.map((p) => p.price));
+    return Math.max(10000, Math.ceil(highest / 1000) * 1000);
+  }, [categoryProducts]);
+
+  useEffect(() => {
+    setMaxPrice(priceSliderMax);
+    setSelectedSize('');
+  }, [categoryName, priceSliderMax]);
 
   // Extract available sizes for this category
   const availableSizes = useMemo(() => {
@@ -52,18 +62,18 @@ const Category = () => {
           
           <div className="mb-8">
             <h3 className="text-sm font-semibold text-gray-900 mb-4">Max Price: ₹{maxPrice}</h3>
-            <input 
-              type="range" 
-              min="0" 
-              max="10000" 
-              step="100"
+            <input
+              type="range"
+              min="0"
+              max={priceSliderMax}
+              step={priceSliderMax > 10000 ? 500 : 100}
               value={maxPrice}
               onChange={(e) => setMaxPrice(Number(e.target.value))}
               className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
             />
             <div className="flex justify-between text-xs text-gray-500 mt-2">
               <span>₹0</span>
-              <span>₹10,000+</span>
+              <span>₹{priceSliderMax.toLocaleString('en-IN')}+</span>
             </div>
           </div>
 
@@ -93,8 +103,8 @@ const Category = () => {
               </div>
             </div>
           )}
-          <button 
-            onClick={() => { setMaxPrice(10000); setSelectedSize(''); }}
+          <button
+            onClick={() => { setMaxPrice(priceSliderMax); setSelectedSize(''); }}
             className="w-full mt-8 py-2 text-sm font-semibold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 rounded-lg transition-colors"
           >
             Clear Filters
@@ -104,7 +114,7 @@ const Category = () => {
 
       {/* Main Content */}
       <div className="flex-1">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2 capitalize">{name}</h1>
+        <h1 className="text-3xl font-bold text-gray-900 mb-2">{categoryName === 'all' ? 'All Products' : categoryName}</h1>
         <p className="text-gray-500 mb-8">Showing {filteredProducts.length} results</p>
 
         {filteredProducts.length > 0 ? (
