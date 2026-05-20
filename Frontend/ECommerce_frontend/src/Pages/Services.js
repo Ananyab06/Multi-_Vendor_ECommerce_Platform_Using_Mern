@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Calendar, CheckCircle2, Star, X } from 'lucide-react';
 import { useAppContext } from '../Context/AppContext';
+// import serviceHeroImg from '../banners/service5.jfif';
 
 const timeSlots = [
   '09:00 AM - 11:00 AM',
@@ -56,21 +57,45 @@ const Services = () => {
 
   return (
     <div className="space-y-16">
-      <section className="relative rounded-3xl overflow-hidden bg-teal-900 text-white">
-        <div className="absolute inset-0">
-          <img
-            src="https://images.unsplash.com/photo-1581578731548-c64695cc6952?ixlib=rb-1.2.1&auto=format&fit=crop&w=2000&q=80"
-            alt="Services Hero"
-            className="w-full h-full object-cover opacity-30 mix-blend-overlay"
-          />
-        </div>
-        <div className="relative max-w-7xl mx-auto px-6 py-24 sm:py-32 lg:px-8 text-center">
-          <h1 className="text-4xl font-extrabold tracking-tight sm:text-5xl lg:text-6xl">
-            Professional Services at Your Doorstep
-          </h1>
-          <p className="mt-6 text-xl max-w-2xl mx-auto text-teal-100">
-            Book verified experts for home cleaning, repairs, and maintenance. Satisfaction guaranteed.
-          </p>
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="flex flex-col lg:flex-row items-center gap-12 bg-white rounded-3xl p-6 lg:p-12 shadow-sm border border-slate-100">
+          {/* Left Column */}
+          <div className="flex-1 space-y-8">
+            <h1 className="text-4xl font-extrabold text-slate-900 sm:text-5xl lg:text-5xl leading-tight">
+              Expert Professional Services
+            </h1>
+            <div className="flex items-center gap-2 text-lg font-medium text-slate-600">
+              <Star className="h-6 w-6 fill-yellow-400 text-yellow-400" />
+              <span className="text-slate-900 font-bold">4.9</span> (25.5M bookings near you)
+            </div>
+            
+            {/* Mock Categories */}
+            <div className="flex gap-6 pt-6 border-t border-slate-100 overflow-x-auto pb-4 scrollbar-hide">
+              {[
+                { name: 'Cleaning', icon: '🧹' },
+                { name: 'Plumbing', icon: '🔧' },
+                { name: 'Repairs', icon: '🔨' },
+                { name: 'AC Service', icon: '❄️' },
+                { name: 'and more...', icon: '✨' },
+              ].map((cat, index) => (
+                <div key={index} className="flex flex-col items-center gap-3 text-center flex-shrink-0">
+                  <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center text-3xl shadow-sm border border-slate-100">
+                    {cat.icon}
+                  </div>
+                  <span className="text-sm font-bold text-slate-700">{cat.name}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Right Column */}
+          <div className="flex-1 w-full max-w-lg lg:max-w-none relative rounded-2xl overflow-hidden shadow-2xl">
+            <img
+              // src={serviceHeroImg}
+              alt="Professional Services"
+              className="w-full h-[350px] object-cover"
+            />
+          </div>
         </div>
       </section>
 

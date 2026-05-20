@@ -207,6 +207,51 @@ exports.getVendorOrders = async (req, res) => {
   }
 };
 
+// Submit feedback for a delivered order (customer only)
+exports.submitOrderFeedback = async (req, res) => {
+  try {
+    const { orderId } = req.params;
+    const { rating, comment } = req.body;
+
+    const parsedRating = Number(rating);
+    if (!parsedRating || parsedRating < 1 || parsedRating > 5) {
+      return res.status(400).json({ message: 'Rating must be between 1 and 5' });
+    }
+
+    const order = await Order.findById(orderId);
+    if (!order) {
+      return res.status(404).json({ message: 'Order not found' });
+    }
+
+    if (order.userId.toString() !== req.user.id) {
+      return res.status(403).json({ message: 'Not authorized to review this order' });
+    }
+
+    if (order.status !== 'delivered') {
+      return res.status(400).json({ message: 'Feedback is only allowed after delivery' });
+    }
+
+    if (order.feedback?.rating) {
+      return res.status(400).json({ message: 'Feedback already submitted for this order' });
+    }
+
+    order.feedback = {
+      rating: parsedRating,
+      comment: (comment || '').trim(),
+      createdAt: new Date(),
+    };
+    await order.save();
+
+    res.json({
+      message: 'Feedback submitted successfully',
+      feedback: order.feedback,
+    });
+  } catch (err) {
+    console.error('Error submitting order feedback:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
 // Update order status
 exports.updateOrderStatus = async (req, res) => {
   try {

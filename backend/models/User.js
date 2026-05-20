@@ -12,6 +12,14 @@ const userSchema = new mongoose.Schema({
     required: true,
     unique: true,
     lowercase: true,
+    match: [/^[^\s@]+@[^\s@]+\.[^\s@]+$/, 'Please fill a valid email address'],
+  },
+  mobile: {
+    type: String,
+    trim: true,
+    unique: true,
+    sparse: true,
+    match: [/^[0-9]{10}$/, 'Please enter a valid 10-digit mobile number'],
   },
   password: {
     type: String,
@@ -22,6 +30,15 @@ const userSchema = new mongoose.Schema({
     enum: ['user', 'vendor'],
     default: 'user',
   },
+  addresses: [
+    {
+      name: { type: String, required: true, trim: true },
+      street: { type: String, required: true, trim: true },
+      city: { type: String, required: true, trim: true },
+      state: { type: String, required: true, trim: true },
+      zip: { type: String, required: true, trim: true },
+    },
+  ],
 }, { timestamps: true });
 
 // Hash password before saving
@@ -38,4 +55,3 @@ userSchema.methods.comparePassword = async function (candidatePassword) {
 };
 
 module.exports = mongoose.model('User', userSchema);
-

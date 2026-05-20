@@ -1,6 +1,20 @@
 const Vendor = require('../models/Vendor');
 const jwt = require('jsonwebtoken');
 
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const MOBILE_REGEX = /^[0-9]{10}$/;
+
+const findVendorByIdentifier = (identifier) => {
+  const trimmed = identifier.trim();
+  if (EMAIL_REGEX.test(trimmed)) {
+    return Vendor.findOne({ email: trimmed.toLowerCase() });
+  }
+  if (MOBILE_REGEX.test(trimmed)) {
+    return Vendor.findOne({ mobile: trimmed });
+  }
+  return null;
+};
+
 // Generate JWT token
 const generateToken = (id) => {
   return jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: '7d' });
@@ -9,12 +23,21 @@ const generateToken = (id) => {
 // Register vendor
 exports.register = async (req, res) => {
   try {
-    const { name, email, password, storeName } = req.body;
+    const { name, email, password, storeName, mobile } = req.body;
+
+    if (!mobile || !MOBILE_REGEX.test(mobile)) {
+      return res.status(400).json({ message: 'A valid 10-digit mobile number is required' });
+    }
 
     // Check if vendor already exists
     let vendor = await Vendor.findOne({ email });
     if (vendor) {
-      return res.status(400).json({ message: 'Vendor already exists' });
+      return res.status(400).json({ message: 'Vendor already exists with this email' });
+    }
+
+    const existingMobile = await Vendor.findOne({ mobile });
+    if (existingMobile) {
+      return res.status(400).json({ message: 'Vendor already exists with this mobile number' });
     }
 
     // Create new vendor
@@ -23,6 +46,7 @@ exports.register = async (req, res) => {
       email,
       password,
       storeName,
+      mobile,
     });
 
     await vendor.save();
@@ -37,6 +61,7 @@ exports.register = async (req, res) => {
         id: vendor._id,
         name: vendor.name,
         email: vendor.email,
+        mobile: vendor.mobile,
         storeName: vendor.storeName,
         isVendor: true,
       },
@@ -50,10 +75,14 @@ exports.register = async (req, res) => {
 // Login vendor
 exports.login = async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const { email, mobile, identifier, password } = req.body;
+    const loginId = (identifier || email || mobile || '').trim();
 
-    // Find vendor by email
-    const vendor = await Vendor.findOne({ email });
+    if (!loginId || !password) {
+      return res.status(400).json({ message: 'Email or mobile number and password are required' });
+    }
+
+    const vendor = await findVendorByIdentifier(loginId);
     if (!vendor) {
       return res.status(400).json({ message: 'Invalid credentials' });
     }
@@ -74,6 +103,7 @@ exports.login = async (req, res) => {
         id: vendor._id,
         name: vendor.name,
         email: vendor.email,
+        mobile: vendor.mobile,
         storeName: vendor.storeName,
         isVendor: true, 
       },

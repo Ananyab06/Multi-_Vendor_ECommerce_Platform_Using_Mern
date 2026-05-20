@@ -65,6 +65,21 @@ const orderSchema = new mongoose.Schema({
     enum: ['pending', 'paid', 'failed'],
     default: 'pending',
   },
+  feedback: {
+    rating: {
+      type: Number,
+      min: 1,
+      max: 5,
+    },
+    comment: {
+      type: String,
+      trim: true,
+      maxlength: 1000,
+    },
+    createdAt: {
+      type: Date,
+    },
+  },
 }, { timestamps: true });
 
 // Index for efficient queries

@@ -1,7 +1,84 @@
-import React, { useRef } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { Star, ShoppingCart, Heart, ChevronLeft, ChevronRight } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAppContext } from '../Context/AppContext';
+
+const dynamicBanners = [
+  {
+    id: 1,
+    title: "Starting ₹99 | Budget Store",
+    subtitle: "Top Brands · Wide Selection",
+    badge: "Unlimited 5% Cashback with Amazon Pay ICICI card",
+    bgGradient: "from-sky-100 via-sky-200 to-indigo-100",
+    image: "https://images.unsplash.com/photo-1556911220-e15b29be8c8f?w=600&auto=format&fit=crop",
+    link: "/category/Home%20%26%20Living"
+  },
+  {
+    id: 2,
+    title: "Up to 60% off on Smart Electronics",
+    subtitle: "Latest Mobiles, Laptops & Audio Gear",
+    badge: "No Cost EMI available up to 12 Months",
+    bgGradient: "from-[#e3fafc] via-[#c5f6fa] to-[#99e9f2]",
+    image: "https://images.unsplash.com/photo-1542751371-adc38448a05e?w=600&auto=format&fit=crop",
+    link: "/category/Electronics"
+  },
+  {
+    id: 3,
+    title: "Upgrade Your Wardrobe",
+    subtitle: "Styles for Men, Women & Kids",
+    badge: "Extra ₹200 off on your first fashion order",
+    bgGradient: "from-[#f3f0ff] via-[#e5dbff] to-[#d0bfff]",
+    image: "https://images.unsplash.com/photo-1483985988355-763728e1935b?w=600&auto=format&fit=crop",
+    link: "/category/Fashion"
+  }
+];
+
+const promoCards = [
+  {
+    title: "Appliances for your home",
+    link: "/category/Electronics",
+    linkText: "See all offers",
+    items: [
+      { name: "Air Conditioners", image: "https://images.unsplash.com/photo-1621905252507-b354bc25edac?w=300", offer: "Up to 45% off" },
+      { name: "Refrigerators", image: "https://images.unsplash.com/photo-1571175482276-5447b5238506?w=300", offer: "Up to 35% off" },
+      { name: "Microwaves", image: "https://images.unsplash.com/photo-1574269661728-8a27d4a5c92c?w=300", offer: "Min 20% off" },
+      { name: "Washing Machines", image: "https://images.unsplash.com/photo-1626806787461-102c1bfaaea1?w=300", offer: "Up to 50% off" }
+    ]
+  },
+  {
+    title: "Revamp your home in style",
+    link: "/category/Home%20%26%20Living",
+    linkText: "Explore home decor",
+    items: [
+      { name: "Bedsheets", image: "https://images.unsplash.com/photo-1522771739844-6a9f6d5f14af?w=300", offer: "Starting ₹199" },
+      { name: "Curtains", image: "https://images.unsplash.com/photo-1513694203232-719a280e022f?w=300", offer: "Starting ₹299" },
+      { name: "Cushions", image: "https://images.unsplash.com/photo-1584100936595-c0654b55a2e2?w=300", offer: "Under ₹149" },
+      { name: "Wall Art", image: "https://images.unsplash.com/photo-1513519245088-0e12902e5a38?w=300", offer: "Up to 60% off" }
+    ]
+  },
+  {
+    title: "Starting ₹49 | Daily essentials",
+    link: "/category/Groceries",
+    linkText: "Shop essentials",
+    items: [
+      { name: "Cleaning Wipes", image: "https://images.unsplash.com/photo-1583947215259-38e31be8751f?w=300", offer: "Starting ₹49" },
+      { name: "Laundry Detergents", image: "https://images.unsplash.com/photo-1610557892470-76d74cd120a1?w=300", offer: "Up to 30% off" },
+      { name: "Kitchen Towels", image: "https://images.unsplash.com/photo-1601004890684-d8cbf643f5f2?w=300", offer: "Under ₹99" },
+      { name: "Soaps & Sanitizers", image: "https://images.unsplash.com/photo-1603048588665-791ca8aea617?w=300", offer: "Buy 1 Get 1 Free" }
+    ]
+  },
+  {
+    title: "Top Offers on Beauty & Grooming",
+    link: "/category/Beauty",
+    linkText: "View all beauty deals",
+    items: [
+      { name: "Skincare", image: "https://images.unsplash.com/photo-1556228720-195a672e8a03?w=300", offer: "Min 15% off" },
+      { name: "Hair Care", image: "https://images.unsplash.com/photo-1535585209827-a15fcdbc4c2d?w=300", offer: "Up to 40% off" },
+      { name: "Makeup", image: "https://images.unsplash.com/photo-1522335789203-aabd1fc54bc9?w=300", offer: "Starting ₹149" },
+      { name: "Fragrances", image: "https://images.unsplash.com/photo-1541643600914-78b084683601?w=300", offer: "Flat 25% off" }
+    ]
+  }
+];
 
 const categories = [
   { name: 'Electronics', image: 'https://img.freepik.com/premium-photo/futuristic-gadgets-showcase-lineup-sleek-modern-technological-devices_977107-682.jpg?w=1060' },
@@ -16,7 +93,25 @@ const categories = [
 
 const Home = () => {
   const { addToCart, toggleWishlist, wishlist, products, user } = useAppContext();
+  const navigate = useNavigate();
   const sliderRef = useRef(null);
+  const [currentSlide, setCurrentSlide] = useState(0);
+
+  useEffect(() => {
+    if (user?.isVendor) {
+      navigate('/vendor');
+    }
+  }, [user, navigate]);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentSlide((prev) => (prev + 1) % dynamicBanners.length);
+    }, 4000);
+    return () => clearInterval(timer);
+  }, []);
+  
+  const nextSlide = () => setCurrentSlide((prev) => (prev + 1) % dynamicBanners.length);
+  const prevSlide = () => setCurrentSlide((prev) => (prev - 1 + dynamicBanners.length) % dynamicBanners.length);
   
   const featuredProducts = products.slice(0, 5);
 
@@ -30,46 +125,78 @@ const Home = () => {
 
   return (
     <div className="space-y-16">
-      {/* Hero Section */}
-      <section className="relative rounded-3xl overflow-hidden bg-indigo-900 text-white">
-        <div className="absolute inset-0">
-          <img
-            src="https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?ixlib=rb-1.2.1&auto=format&fit=crop&w=2000&q=80"
-            alt="Hero Background"
-            className="w-full h-full object-cover opacity-40 mix-blend-overlay"
-          />
-          <div className="absolute inset-0 bg-gradient-to-r from-indigo-900 via-indigo-900/80 to-transparent"></div>
+      {/* Banners Section */}
+      <section className="relative overflow-hidden shadow-md h-[340px] md:h-[450px] group w-screen -ml-[calc(50vw-50%)] bg-gray-100">
+        <div className="flex w-full h-full transition-transform duration-700 ease-in-out" style={{ transform: `translateX(-${currentSlide * 100}%)` }}>
+          {dynamicBanners.map((banner) => (
+            <div key={banner.id} className={`w-full flex-shrink-0 min-w-full h-full relative bg-gradient-to-r ${banner.bgGradient} flex items-center justify-between px-8 md:px-20`}>
+              {/* Left Content */}
+              <div className="max-w-lg space-y-4">
+                <span className="bg-red-600 text-white text-[10px] font-black px-2.5 py-1 rounded-full uppercase tracking-wider">Limited Time Offer</span>
+                <h1 className="text-3xl md:text-5xl font-black text-gray-950 tracking-tight leading-tight">{banner.title}</h1>
+                <p className="text-base md:text-xl font-bold text-gray-700">{banner.subtitle}</p>
+                <div className="bg-white/80 backdrop-blur-sm border border-gray-200/50 p-3 rounded-xl inline-flex items-center gap-2 shadow-sm">
+                  <span className="bg-yellow-400 text-gray-950 text-[10px] font-black px-2 py-0.5 rounded">PAYBACK</span>
+                  <span className="text-xs font-bold text-gray-800">{banner.badge}</span>
+                </div>
+                <div>
+                  <Link to={banner.link} className="inline-block bg-[#3c4f68] hover:bg-[#2d3a4c] text-white font-black text-sm px-6 py-3 rounded-full shadow-lg transition-all transform hover:scale-105">
+                    Shop Now
+                  </Link>
+                </div>
+              </div>
+              {/* Right Image Container */}
+              <div className="hidden md:block w-96 h-72 rounded-2xl overflow-hidden shadow-2xl border-4 border-white bg-white transform rotate-2 hover:rotate-0 transition-transform duration-500">
+                <img
+                  src={banner.image}
+                  alt={banner.title}
+                  className="w-full h-full object-cover saturate-125 hover:scale-110 transition-transform duration-700"
+                />
+              </div>
+            </div>
+          ))}
         </div>
-        <div className="relative max-w-7xl mx-auto px-6 py-24 sm:py-32 lg:px-8 flex flex-col items-start">
-          <h1 className="text-4xl font-extrabold tracking-tight sm:text-5xl lg:text-6xl max-w-2xl">
-            {user?.isVendor ? 'Grow Your Business with UniBox' : 'Discover Exceptional Products for Your Lifestyle'}
-          </h1>
-          <p className="mt-6 text-xl max-w-xl text-indigo-100">
-            {user?.isVendor 
-              ? 'Manage your products, track sales, and connect with customers. Build your online store and reach more buyers today.'
-              : 'Shop the latest trends, newest electronics, and premium services all in one place. Experience seamless shopping today.'
-            }
-          </p>
-          {!user?.isVendor && (
-            <div className="mt-10 flex gap-4">
-              <a href="#featured-products" className="inline-flex items-center justify-center px-8 py-3 border border-transparent text-base font-medium rounded-full text-indigo-900 bg-white hover:bg-indigo-50 transition-colors shadow-lg hover:shadow-xl">
-                Shop Now
-              </a>
-              <Link to="/services" className="inline-flex items-center justify-center px-8 py-3 border-2 border-white text-base font-medium rounded-full text-white hover:bg-white/10 transition-colors">
-                Explore Services
+        
+        {/* Navigation Arrows */}
+        <button 
+          onClick={prevSlide}
+          className="absolute left-4 top-1/2 -translate-y-1/2 bg-white/50 hover:bg-white/90 backdrop-blur-sm p-3 rounded-full text-gray-900 opacity-0 group-hover:opacity-100 transition-all duration-300 shadow"
+        >
+          <ChevronLeft className="h-6 w-6" />
+        </button>
+        <button 
+          onClick={nextSlide}
+          className="absolute right-4 top-1/2 -translate-y-1/2 bg-white/50 hover:bg-white/90 backdrop-blur-sm p-3 rounded-full text-gray-900 opacity-0 group-hover:opacity-100 transition-all duration-300 shadow"
+        >
+          <ChevronRight className="h-6 w-6" />
+        </button>
+      </section>
+
+      {/* Overlapping E-commerce Promo Cards */}
+      <section className="relative z-10 -mt-20 md:-mt-32 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+          {promoCards.map((card, index) => (
+            <div key={index} className="bg-white rounded-2xl p-5 shadow-lg border border-gray-100 flex flex-col h-full hover:shadow-2xl transition-shadow duration-300">
+              <h3 className="text-lg font-black text-gray-900 mb-4 tracking-tight leading-snug">{card.title}</h3>
+              <div className="grid grid-cols-2 gap-3 flex-grow mb-4">
+                {card.items.map((item, idx) => (
+                  <div key={idx} className="flex flex-col">
+                    <div className="aspect-square bg-slate-50 rounded-xl overflow-hidden mb-1.5 border border-slate-100">
+                      <img src={item.image} alt={item.name} className="w-full h-full object-cover hover:scale-110 transition-transform duration-500" />
+                    </div>
+                    <span className="text-[10px] font-bold text-gray-900 truncate">{item.name}</span>
+                    <span className="text-[9px] font-bold text-emerald-600">{item.offer}</span>
+                  </div>
+                ))}
+              </div>
+              <Link to={card.link} className="text-xs font-bold text-indigo-600 hover:text-indigo-800 transition-colors mt-auto pt-2 block border-t border-slate-50">
+                {card.linkText} →
               </Link>
             </div>
-          )}
-          {user?.isVendor && (
-            <div className="mt-10 flex gap-4">
-              <Link to="/vendor" className="inline-flex items-center justify-center px-8 py-3 border-2 border-white text-base font-medium rounded-full text-white hover:bg-white/10 transition-colors">
-                Manage Store
-              </Link>
-            </div>
-          )}
+          ))}
         </div>
       </section>
-      
+
        {/* Categories Section (Slider) */}
       <section>
         <div className="flex justify-between items-end mb-8">
@@ -85,13 +212,13 @@ const Home = () => {
         </div>
         <div ref={sliderRef} className="flex gap-6 overflow-x-auto snap-x snap-mandatory scrollbar-hide pb-4" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
           {categories.map((category) => (
-            <Link to={`/category/${encodeURIComponent(category.name)}`} key={category.name} className="flex-none w-64 snap-start group relative rounded-2xl overflow-hidden cursor-pointer shadow-md hover:shadow-xl transition-all duration-300">
+            <Link to={`/category/${encodeURIComponent(category.name)}`} key={category.name} className="flex-none w-64 snap-start group relative rounded-2xl overflow-hidden cursor-pointer shadow-md hover:shadow-2xl hover:-translate-y-2 transition-all duration-300 border border-transparent hover:border-indigo-500/30">
               <div className="aspect-w-3 aspect-h-4">
-                <img src={category.image} alt={category.name} className="w-full h-80 object-cover group-hover:scale-105 transition-transform duration-500" />
+                <img src={category.image} alt={category.name} className="w-full h-80 object-cover group-hover:scale-110 transition-transform duration-700 ease-out" />
               </div>
-              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-80 group-hover:opacity-90 transition-opacity"></div>
-              <div className="absolute bottom-0 left-0 p-6 w-full">
-                <h3 className="text-xl font-bold text-white">{category.name}</h3>
+              <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-transparent opacity-80 group-hover:opacity-100 transition-opacity duration-300"></div>
+              <div className="absolute bottom-0 left-0 p-6 w-full transform group-hover:-translate-y-2 transition-transform duration-300">
+                <h3 className="text-xl font-black text-white tracking-wide">{category.name}</h3>
               </div>
             </Link>
           ))}
@@ -170,6 +297,3 @@ const Home = () => {
 };
 
 export default Home;
-
-
-

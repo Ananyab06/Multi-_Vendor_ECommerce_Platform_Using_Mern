@@ -3,6 +3,12 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAppContext } from '../Context/AppContext';
 import { loginUser, loginVendor } from '../api';
 
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const MOBILE_REGEX = /^[0-9]{10}$/;
+
+const isValidIdentifier = (value) =>
+  EMAIL_REGEX.test(value.trim()) || MOBILE_REGEX.test(value.trim());
+
 const AccountTypeToggle = ({ accountType, onChange }) => (
   <div className="flex rounded-full bg-gray-100 p-1 mb-8">
     <button
@@ -33,7 +39,7 @@ const AccountTypeToggle = ({ accountType, onChange }) => (
 const Login = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const accountType = searchParams.get('type') === 'vendor' ? 'vendor' : 'user';
-  const [email, setEmail] = useState('');
+  const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
@@ -58,17 +64,23 @@ const Login = () => {
 
   const handleLogin = async (e) => {
     e.preventDefault();
+    const trimmedId = identifier.trim();
+    if (!isValidIdentifier(trimmedId)) {
+      alert('Please enter a valid email address or 10-digit mobile number.');
+      return;
+    }
     setLoading(true);
 
     try {
+      const credentials = { identifier: trimmedId, password };
       if (accountType === 'vendor') {
-        const response = await loginVendor({ email, password });
+        const response = await loginVendor(credentials);
         const { token, vendor } = response.data;
         const vendorWithFlag = { ...vendor, id: vendor.id || vendor._id, isVendor: true };
         login(vendorWithFlag, token);
         navigate('/vendor');
       } else {
-        const response = await loginUser({ email, password });
+        const response = await loginUser(credentials);
         const { token, user: userData } = response.data;
         login(userData, token);
         navigate('/');
@@ -98,17 +110,18 @@ const Login = () => {
       <form onSubmit={handleLogin} className="space-y-6">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
-            {isVendor ? 'Business Email' : 'Email Address'}
+            Email or Mobile Number
           </label>
           <input
-            type="email"
+            type="text"
             required
             className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors"
-            placeholder={isVendor ? 'vendor@example.com' : 'john@example.com'}
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            autoComplete="email"
+            placeholder={isVendor ? 'vendor@example.com or 9876543210' : 'john@example.com or 9876543210'}
+            value={identifier}
+            onChange={(e) => setIdentifier(e.target.value)}
+            autoComplete="username"
           />
+          <p className="mt-1 text-xs text-gray-500">Use your registered email or 10-digit mobile number</p>
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">Password</label>

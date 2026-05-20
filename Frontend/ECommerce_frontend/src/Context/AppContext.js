@@ -149,8 +149,8 @@ export const AppProvider = ({ children }) => {
               id: order._id,
               date: new Date(order.createdAt).toISOString().split('T')[0],
               items: order.items.map(item => ({
-                id: item.productId._id || item.productId,
-                name: item.name,
+                id: item.productId?._id || item.productId || item._id,
+                name: item.name || item.productId?.name || 'Product',
                 price: item.price,
                 qty: item.qty,
                 size: item.size,
@@ -158,6 +158,14 @@ export const AppProvider = ({ children }) => {
               })),
               total: order.totalAmount,
               status: order.status,
+              itemsCount: order.items.reduce((acc, item) => acc + (item.qty || 0), 0),
+              feedback: order.feedback?.rating
+                ? {
+                    rating: order.feedback.rating,
+                    comment: order.feedback.comment || '',
+                    createdAt: order.feedback.createdAt,
+                  }
+                : null,
             }));
             setOrders(transformedOrders);
           }
@@ -363,6 +371,34 @@ export const AppProvider = ({ children }) => {
     }
   }, [user]);
 
+  const submitOrderFeedback = async (orderId, { rating, comment }) => {
+    try {
+      const response = await api.submitOrderFeedback(orderId, { rating, comment });
+      const feedback = response.data.feedback;
+      setOrders((prev) =>
+        prev.map((order) =>
+          order.id === orderId
+            ? {
+                ...order,
+                feedback: {
+                  rating: feedback.rating,
+                  comment: feedback.comment || '',
+                  createdAt: feedback.createdAt,
+                },
+              }
+            : order
+        )
+      );
+      return { success: true };
+    } catch (err) {
+      console.error('Failed to submit feedback', err);
+      return {
+        success: false,
+        error: err.response?.data?.message || 'Failed to submit feedback',
+      };
+    }
+  };
+
   const addOrder = async (orderData) => {
     try {
       for (const item of cart) {
@@ -383,9 +419,18 @@ export const AppProvider = ({ children }) => {
       const newOrder = {
         id: response.data.order.id,
         date: new Date().toISOString().split('T')[0],
-        items: response.data.order.items,
+        items: response.data.order.items.map(item => ({
+          id: item.productId?._id || item.productId || item._id,
+          name: item.name || item.productId?.name || 'Product',
+          price: item.price,
+          qty: item.qty,
+          size: item.size,
+          vendor: item.vendor,
+        })),
         total: response.data.order.totalAmount,
         status: response.data.order.status,
+        itemsCount: response.data.order.items.reduce((acc, item) => acc + (item.qty || 0), 0),
+        feedback: null,
       };
 
       // Update local state
@@ -523,7 +568,7 @@ export const AppProvider = ({ children }) => {
       wishlist, setWishlist, toggleWishlist, removeFromWishlist, 
       user, setUser, login, logout, authLoading,
       serviceBookings, addServiceBooking, updateServiceBookingStatus, refreshServiceBookings,
-      orders, addOrder,
+      orders, addOrder, submitOrderFeedback,
       products, addProduct, updateProduct, deleteProduct,
       services, addService, updateService, deleteService,
       loading

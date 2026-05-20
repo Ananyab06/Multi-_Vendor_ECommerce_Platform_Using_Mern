@@ -5,7 +5,7 @@ import {
 } from 'lucide-react';
 import { useAppContext } from '../Context/AppContext';
 import { useNavigate } from 'react-router-dom';
-import { getVendorOrders, uploadImage } from '../api';
+import { getVendorOrders, uploadImage, updateOrderStatus } from '../api';
 
 const VendorDashboard = () => {
   const { 
@@ -54,8 +54,8 @@ const VendorDashboard = () => {
         id: order._id,
         date: new Date(order.createdAt).toISOString().split('T')[0],
         items: (order.vendorItems || order.items).map((item) => ({
-          id: item.productId?._id || item.productId,
-          name: item.name,
+          id: item.productId?._id || item.productId || item._id,
+          name: item.name || item.productId?.name || 'Product',
           price: item.price,
           qty: item.qty,
           size: item.size,
@@ -87,6 +87,16 @@ const VendorDashboard = () => {
     const interval = setInterval(loadVendorOrders, 30000);
     return () => clearInterval(interval);
   }, [loadVendorOrders]);
+
+  const handleUpdateOrderStatus = async (orderId, newStatus) => {
+    try {
+      await updateOrderStatus(orderId, newStatus);
+      await loadVendorOrders();
+    } catch (err) {
+      console.error('Failed to update order status:', err);
+      alert(err.response?.data?.message || 'Failed to update order status');
+    }
+  };
 
   const [activeTab, setActiveTab] = useState('dashboard');
   const [inventorySubTab, setInventorySubTab] = useState('all'); // 'all', 'product', 'service'
@@ -973,7 +983,22 @@ const VendorDashboard = () => {
                               <p className="text-xs font-medium text-slate-400">{vendorItems.length} item(s) · {order.customer}</p>
                             </td>
                             <td className="px-8 py-6">
-                              <span className="px-3 py-1 bg-amber-100 text-amber-700 rounded-full text-[10px] font-black uppercase capitalize">{order.status || 'processing'}</span>
+                              <select
+                                value={order.status || 'processing'}
+                                onChange={(e) => handleUpdateOrderStatus(order.id, e.target.value)}
+                                className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase border-none focus:ring-2 focus:ring-indigo-500 cursor-pointer ${
+                                  order.status === 'delivered' ? 'bg-emerald-100 text-emerald-700' :
+                                  order.status === 'shipped' ? 'bg-indigo-100 text-indigo-700' :
+                                  order.status === 'cancelled' ? 'bg-rose-100 text-rose-700' :
+                                  'bg-amber-100 text-amber-700'
+                                }`}
+                              >
+                                {['pending', 'processing', 'shipped', 'delivered', 'cancelled'].map((status) => (
+                                  <option key={status} value={status} className="bg-white text-slate-900 text-xs font-bold lowercase">
+                                    {status}
+                                  </option>
+                                ))}
+                              </select>
                             </td>
                             <td className="px-8 py-6 text-sm font-black text-slate-900">₹{(order.total ?? vendorTotal).toFixed(2)}</td>
                             <td className="px-8 py-6 text-sm font-medium text-slate-500">{order.date}</td>
@@ -1163,11 +1188,3 @@ const VendorDashboard = () => {
 };
 
 export default VendorDashboard;
-
-
-
-
-
-
-
-// *********************** VendorLogin 

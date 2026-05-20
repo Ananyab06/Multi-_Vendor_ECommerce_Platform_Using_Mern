@@ -60,6 +60,10 @@ const Register = () => {
 
   const handleRegister = async (e) => {
     e.preventDefault();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+      alert('Please enter a valid email address.');
+      return;
+    }
     setLoading(true);
 
     try {
@@ -78,9 +82,10 @@ const Register = () => {
       } else {
         const userData = {
           name: name || 'User',
-          email: email || identifier,
+          email: email.trim(),
           password,
           role: 'user',
+          ...(identifier.trim() ? { mobile: identifier.trim() } : {}),
         };
         const response = await registerUser(userData);
         const { token, user } = response.data;

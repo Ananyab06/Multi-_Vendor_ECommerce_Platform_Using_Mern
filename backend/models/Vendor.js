@@ -12,6 +12,14 @@ const vendorSchema = new mongoose.Schema({
     required: true,
     unique: true,
     lowercase: true,
+    match: [/^[^\s@]+@[^\s@]+\.[^\s@]+$/, 'Please fill a valid email address'],
+  },
+  mobile: {
+    type: String,
+    required: true,
+    trim: true,
+    unique: true,
+    match: [/^[0-9]{10}$/, 'Please enter a valid 10-digit mobile number'],
   },
   password: {
     type: String,

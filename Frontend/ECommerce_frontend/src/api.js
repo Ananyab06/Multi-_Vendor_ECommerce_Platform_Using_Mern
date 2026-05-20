@@ -46,6 +46,10 @@ export const createService = (serviceData) => API.post('/services', serviceData)
 export const updateService = (id, serviceData) => API.put(`/services/${id}`, serviceData);
 export const deleteService = (id) => API.delete(`/services/${id}`);
 
+// Address APIs
+export const getAddresses = () => API.get('/addresses');
+export const addAddress = (addressData) => API.post('/addresses', addressData);
+
 // Cart APIs
 export const getCart = () => API.get('/cart');
 export const addToCart = (productId, quantity) => API.post('/cart/add', { productId, quantity });
@@ -65,6 +69,8 @@ export const getUserOrders = () => API.get('/orders/user');
 export const getVendorOrders = (vendorId) => API.get(`/orders/vendor/${vendorId}`);
 export const getAllOrders = () => API.get('/orders/all');
 export const updateOrderStatus = (orderId, status) => API.put(`/orders/${orderId}/status`, { status });
+export const submitOrderFeedback = (orderId, feedback) =>
+  API.post(`/orders/${orderId}/feedback`, feedback);
 
 // Service booking APIs
 export const createServiceBooking = (bookingData) => API.post('/bookings', bookingData);

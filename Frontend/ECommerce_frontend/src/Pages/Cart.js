@@ -2,8 +2,23 @@ import React, { useState, useEffect } from 'react';
 import { Trash2, CreditCard, MapPin, CheckCircle, Truck, Wallet } from 'lucide-react';
 import { useAppContext } from '../Context/AppContext';
 import { useNavigate } from 'react-router-dom';
+import { getAddresses, addAddress as saveAddressApi } from '../api';
 
 const initialAddressForm = { name: '', street: '', city: '', state: '', zip: '' };
+const LOCAL_ADDRESSES_KEY = 'unibox_saved_addresses';
+
+const loadAddressesFromStorage = () => {
+  try {
+    const raw = localStorage.getItem(LOCAL_ADDRESSES_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+};
+
+const persistAddressesToStorage = (addrs) => {
+  localStorage.setItem(LOCAL_ADDRESSES_KEY, JSON.stringify(addrs));
+};
 const initialPaymentForm = { cardNumber: '', expiryDate: '', cvv: '', upiId: '' };
 
 const formatCardNumber = (value) => {
@@ -21,10 +36,10 @@ const validatePaymentForm = (method, data) => {
   const errors = {};
 
   if (method === 'cc') {
-    const cardDigits = data.cardNumber.replace(/\s/g, '');
+    const cardDigits = (data.cardNumber || '').replace(/\D/g, '');
     if (!cardDigits) {
       errors.cardNumber = 'Card number is required';
-    } else if (!/^\d{16}$/.test(cardDigits)) {
+    } else if (cardDigits.length !== 16) {
       errors.cardNumber = 'Enter a valid 16-digit card number';
     }
 
@@ -41,11 +56,11 @@ const validatePaymentForm = (method, data) => {
       }
     }
 
-    const cvv = data.cvv.trim();
+    const cvv = (data.cvv || '').replace(/\D/g, '');
     if (!cvv) {
       errors.cvv = 'CVV is required';
-    } else if (!/^\d{3,4}$/.test(cvv)) {
-      errors.cvv = 'Enter a valid 3 or 4-digit CVV';
+    } else if (cvv.length !== 3) {
+      errors.cvv = 'Enter a valid 3-digit CVV';
     }
   }
 
@@ -161,10 +176,10 @@ const AddressField = ({ label, name, value, onChange, error, placeholder, ...inp
 const Cart = () => {
   const { cart, removeFromCart, updateCartQuantity, updateCartItemSize, setCart, addOrder, user, products } = useAppContext();
   const [checkoutStep, setCheckoutStep] = useState('cart'); // 'cart', 'address', 'payment', 'success'
-  const [addresses, setAddresses] = useState([
-    { id: 1, name: 'John Doe', street: '123 Main St, Apt 4B', city: 'New York', state: 'NY', zip: '10001' }
-  ]);
-  const [selectedAddress, setSelectedAddress] = useState(1);
+  const [addresses, setAddresses] = useState([]);
+  const [selectedAddress, setSelectedAddress] = useState(null);
+  const [addressesLoading, setAddressesLoading] = useState(false);
+  const [savingAddress, setSavingAddress] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState('cc'); // 'cc', 'upi', 'cod'
   const [addressForm, setAddressForm] = useState(initialAddressForm);
   const [addressErrors, setAddressErrors] = useState({});
@@ -183,7 +198,40 @@ const Cart = () => {
     }
   };
 
-  const handleAddAddress = (e) => {
+  useEffect(() => {
+    const loadSavedAddresses = async () => {
+      setAddressesLoading(true);
+      try {
+        if (user && !user.isVendor && localStorage.getItem('token')) {
+          const res = await getAddresses();
+          const list = Array.isArray(res.data) ? res.data : [];
+          setAddresses(list);
+          if (list.length > 0) {
+            setSelectedAddress(list[0].id);
+          }
+        } else {
+          const local = loadAddressesFromStorage();
+          setAddresses(local);
+          if (local.length > 0) {
+            setSelectedAddress(local[0].id);
+          }
+        }
+      } catch (err) {
+        console.error('Failed to load addresses', err);
+        const local = loadAddressesFromStorage();
+        setAddresses(local);
+        if (local.length > 0) {
+          setSelectedAddress(local[0].id);
+        }
+      } finally {
+        setAddressesLoading(false);
+      }
+    };
+
+    loadSavedAddresses();
+  }, [user]);
+
+  const handleAddAddress = async (e) => {
     e.preventDefault();
     const errors = validateAddressForm(addressForm);
     if (Object.keys(errors).length > 0) {
@@ -191,18 +239,49 @@ const Cart = () => {
       return;
     }
 
-    const newAddr = {
-      id: Date.now(),
+    const payload = {
       name: addressForm.name.trim(),
       street: addressForm.street.trim(),
       city: addressForm.city.trim(),
       state: addressForm.state.trim(),
       zip: addressForm.zip.trim(),
     };
-    setAddresses([...addresses, newAddr]);
-    setSelectedAddress(newAddr.id);
-    setAddressForm(initialAddressForm);
-    setAddressErrors({});
+
+    setSavingAddress(true);
+    try {
+      let newAddr;
+      if (user && !user.isVendor && localStorage.getItem('token')) {
+        const res = await saveAddressApi(payload);
+        newAddr = res.data;
+      } else {
+        newAddr = { id: Date.now(), ...payload };
+        const updated = [...addresses, newAddr];
+        persistAddressesToStorage(updated);
+        setAddresses(updated);
+        setSelectedAddress(newAddr.id);
+        setAddressForm(initialAddressForm);
+        setAddressErrors({});
+        return;
+      }
+
+      setAddresses((prev) => [...prev, newAddr]);
+      setSelectedAddress(newAddr.id);
+      setAddressForm(initialAddressForm);
+      setAddressErrors({});
+    } catch (err) {
+      console.error('Failed to save address', err);
+      alert(err.response?.data?.message || 'Failed to save address. Please try again.');
+    } finally {
+      setSavingAddress(false);
+    }
+  };
+
+  const handleProceedToPayment = () => {
+    if (!selectedAddress || !addresses.find((addr) => addr.id === selectedAddress)) {
+      alert('Please save and select a delivery address first.');
+      return;
+    }
+    setCheckoutStep('payment');
   };
 
   const handlePaymentFieldChange = (e) => {
@@ -211,7 +290,7 @@ const Cart = () => {
 
     if (name === 'cardNumber') nextValue = formatCardNumber(value);
     else if (name === 'expiryDate') nextValue = formatExpiryDate(value);
-    else if (name === 'cvv') nextValue = value.replace(/\D/g, '').slice(0, 4);
+    else if (name === 'cvv') nextValue = value.replace(/\D/g, '').slice(0, 3);
     else if (name === 'upiId') nextValue = value.trim().toLowerCase();
 
     setPaymentForm((prev) => ({ ...prev, [name]: nextValue }));
@@ -235,7 +314,7 @@ const Cart = () => {
     }
     setPaymentErrors({});
 
-    const cardDigits = paymentForm.cardNumber.replace(/\s/g, '');
+    const cardDigits = (paymentForm.cardNumber || '').replace(/\D/g, '');
     if (paymentMethod === 'cc' && cardDigits === '0000000000000000') {
       alert('Payment Failed: Your card was declined. Please try again with a different card.');
       navigate('/');
@@ -415,6 +494,13 @@ const Cart = () => {
           <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2"><MapPin /> Select Address</h2>
           
           <div className="space-y-4">
+            {addressesLoading ? (
+              <p className="text-gray-500 text-sm">Loading saved addresses...</p>
+            ) : addresses.length === 0 ? (
+              <p className="text-gray-500 text-sm p-4 bg-gray-50 rounded-2xl border border-gray-100">
+                No saved addresses yet. Add one using the form on the right.
+              </p>
+            ) : null}
             {addresses.map((addr) => (
               <label key={addr.id} className={`block p-4 border-2 rounded-2xl cursor-pointer transition-all ${selectedAddress === addr.id ? 'border-indigo-600 bg-indigo-50' : 'border-gray-100 hover:border-gray-200 bg-white'}`}>
                 <div className="flex items-start gap-3">
@@ -481,12 +567,19 @@ const Cart = () => {
               inputMode="numeric"
               autoComplete="postal-code"
             />
-            <button type="submit" className="w-full py-3 bg-gray-900 text-white rounded-xl font-bold hover:bg-gray-800 transition-colors">Save Address</button>
+            <button
+              type="submit"
+              disabled={savingAddress}
+              className="w-full py-3 bg-gray-900 text-white rounded-xl font-bold hover:bg-gray-800 transition-colors disabled:opacity-50"
+            >
+              {savingAddress ? 'Saving...' : 'Save Address'}
+            </button>
           </form>
 
           <div className="mt-8 pt-8 border-t">
-            <button 
-              onClick={() => setCheckoutStep('payment')}
+            <button
+              type="button"
+              onClick={handleProceedToPayment}
               className="w-full py-4 bg-indigo-600 text-white rounded-full font-bold hover:bg-indigo-700 shadow-md transition-transform hover:-translate-y-0.5"
             >
               Deliver Here & Proceed

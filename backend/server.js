@@ -35,6 +35,7 @@ const orderRoutes = require('./routes/order');
 const bookingRoutes = require('./routes/booking');
 const serviceRoutes = require('./routes/service');
 const uploadRoutes = require('./routes/upload');
+const addressRoutes = require('./routes/address');
 
 // Use routes
 app.use('/api/auth', authRoutes);
@@ -46,6 +47,7 @@ app.use('/api/orders', orderRoutes);
 app.use('/api/bookings', bookingRoutes);
 app.use('/api/services', serviceRoutes);
 app.use('/api/upload', uploadRoutes);
+app.use('/api/addresses', addressRoutes);
 
 // Start server
 app.listen(PORT, () => {

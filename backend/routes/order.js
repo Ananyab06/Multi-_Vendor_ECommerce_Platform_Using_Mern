@@ -9,6 +9,7 @@ router.use(auth);
 // User routes
 router.post('/', orderController.createOrder);
 router.get('/user', orderController.getUserOrders);
+router.post('/:orderId/feedback', orderController.submitOrderFeedback);
 
 // Vendor/Admin routes
 router.get('/vendor/:vendorId', orderController.getVendorOrders);

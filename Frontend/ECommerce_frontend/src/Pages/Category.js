@@ -5,6 +5,9 @@ import { Star, ShoppingCart, Heart, Filter } from 'lucide-react';
 import { useAppContext } from '../Context/AppContext';
 
 const normalizeCategory = (value) => (value || '').trim().toLowerCase();
+const normalizeSize = (value) => String(value || '').trim().toUpperCase();
+
+const SIZE_ORDER = ['XS', 'S', 'M', 'L', 'XL', 'XXL', '8', '9', '10', '11', '12'];
 
 const Category = () => {
   const { name: rawName } = useParams();
@@ -27,26 +30,34 @@ const Category = () => {
   }, [categoryProducts]);
 
   useEffect(() => {
-    setMaxPrice(priceSliderMax);
     setSelectedSize('');
-  }, [categoryName, priceSliderMax]);
+    setMaxPrice(priceSliderMax);
+  }, [categoryName]);
 
-  // Extract available sizes for this category
+  useEffect(() => {
+    setMaxPrice(priceSliderMax);
+  }, [priceSliderMax]);
+
   const availableSizes = useMemo(() => {
     const sizes = new Set();
-    categoryProducts.forEach(p => {
-      if (p.sizes) {
-        p.sizes.forEach(s => sizes.add(s));
-      }
+    categoryProducts.forEach((p) => {
+      (p.sizes || []).forEach((s) => {
+        const normalized = normalizeSize(s);
+        if (normalized) sizes.add(normalized);
+      });
     });
-    return Array.from(sizes);
+    return Array.from(sizes).sort(
+      (a, b) => (SIZE_ORDER.indexOf(a) === -1 ? 99 : SIZE_ORDER.indexOf(a)) -
+                (SIZE_ORDER.indexOf(b) === -1 ? 99 : SIZE_ORDER.indexOf(b)) || a.localeCompare(b)
+    );
   }, [categoryProducts]);
 
-  // Apply filters
   const filteredProducts = useMemo(() => {
-    return categoryProducts.filter(p => {
+    const targetSize = normalizeSize(selectedSize);
+    return categoryProducts.filter((p) => {
       const matchesPrice = p.price <= maxPrice;
-      const matchesSize = selectedSize === '' || (p.sizes && p.sizes.includes(selectedSize));
+      const productSizes = (p.sizes || []).map(normalizeSize);
+      const matchesSize = !targetSize || productSizes.includes(targetSize);
       return matchesPrice && matchesSize;
     });
   }, [categoryProducts, maxPrice, selectedSize]);
@@ -115,7 +126,10 @@ const Category = () => {
       {/* Main Content */}
       <div className="flex-1">
         <h1 className="text-3xl font-bold text-gray-900 mb-2">{categoryName === 'all' ? 'All Products' : categoryName}</h1>
-        <p className="text-gray-500 mb-8">Showing {filteredProducts.length} results</p>
+        <p className="text-gray-500 mb-8">
+          Showing {filteredProducts.length} result{filteredProducts.length !== 1 ? 's' : ''}
+          {selectedSize ? ` in size ${normalizeSize(selectedSize)}` : ''}
+        </p>
 
         {filteredProducts.length > 0 ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">

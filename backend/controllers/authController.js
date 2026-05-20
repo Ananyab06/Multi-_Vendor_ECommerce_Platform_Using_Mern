@@ -1,6 +1,20 @@
 const User = require('../models/User');
 const jwt = require('jsonwebtoken');
 
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const MOBILE_REGEX = /^[0-9]{10}$/;
+
+const findUserByIdentifier = (identifier) => {
+  const trimmed = identifier.trim();
+  if (EMAIL_REGEX.test(trimmed)) {
+    return User.findOne({ email: trimmed.toLowerCase() });
+  }
+  if (MOBILE_REGEX.test(trimmed)) {
+    return User.findOne({ mobile: trimmed });
+  }
+  return null;
+};
+
 // Generate JWT token
 const generateToken = (id) => {
   return jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: '7d' });
@@ -9,12 +23,19 @@ const generateToken = (id) => {
 // Register user
 exports.register = async (req, res) => {
   try {
-    const { name, email, password, role } = req.body;
+    const { name, email, password, role, mobile } = req.body;
 
     // Check if user already exists
     let user = await User.findOne({ email });
     if (user) {
-      return res.status(400).json({ message: 'User already exists' });
+      return res.status(400).json({ message: 'User already exists with this email' });
+    }
+
+    if (mobile) {
+      const existingMobile = await User.findOne({ mobile });
+      if (existingMobile) {
+        return res.status(400).json({ message: 'User already exists with this mobile number' });
+      }
     }
 
     // Create new user
@@ -23,6 +44,7 @@ exports.register = async (req, res) => {
       email,
       password,
       role: role || 'user',
+      ...(mobile ? { mobile } : {}),
     });
 
     await user.save();
@@ -38,6 +60,7 @@ exports.register = async (req, res) => {
         id: user._id,
         name: user.name,
         email: user.email,
+        mobile: user.mobile,
         role: user.role,
       },
     });
@@ -50,10 +73,14 @@ exports.register = async (req, res) => {
 // Login user
 exports.login = async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const { email, mobile, identifier, password } = req.body;
+    const loginId = (identifier || email || mobile || '').trim();
 
-    // Find user by email
-    const user = await User.findOne({ email });
+    if (!loginId || !password) {
+      return res.status(400).json({ message: 'Email or mobile number and password are required' });
+    }
+
+    const user = await findUserByIdentifier(loginId);
     if (!user) {
       return res.status(400).json({ message: 'Invalid credentials' });
     }
@@ -74,6 +101,7 @@ exports.login = async (req, res) => {
         id: user._id,
         name: user.name,
         email: user.email,
+        mobile: user.mobile,
         role: user.role,
       },
     });
