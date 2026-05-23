@@ -9,5 +9,6 @@ router.post('/', bookingController.createBooking);
 router.get('/user', bookingController.getUserBookings);
 router.get('/vendor/:vendorId', bookingController.getVendorBookings);
 router.patch('/:bookingId/status', bookingController.updateBookingStatus);
+router.post('/:bookingId/feedback', bookingController.submitServiceBookingFeedback);
 
 module.exports = router;

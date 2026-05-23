@@ -44,6 +44,10 @@ const orderSchema = new mongoose.Schema({
     type: Number,
     required: true,
   },
+  discountAmount: {
+    type: Number,
+    default: 0,
+  },
   status: {
     type: String,
     enum: ['pending', 'processing', 'shipped', 'delivered', 'cancelled'],
@@ -80,7 +84,21 @@ const orderSchema = new mongoose.Schema({
       type: Date,
     },
   },
+  orderNumber: {
+    type: String,
+    unique: true,
+  },
 }, { timestamps: true });
+
+// Pre-save hook to generate orderNumber
+orderSchema.pre('save',async function () {
+  if (!this.orderNumber) {
+    const p1 = Math.floor(100 + Math.random() * 900);
+    const p2 = Math.floor(1000000 + Math.random() * 9000000);
+    const p3 = Math.floor(1000000 + Math.random() * 9000000);
+    this.orderNumber = `${p1}-${p2}-${p3}`;
+  }
+});
 
 // Index for efficient queries
 orderSchema.index({ userId: 1, createdAt: -1 });

@@ -38,12 +38,32 @@ const serviceBookingSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ['Pending', 'Confirmed', 'Completed'],
+      enum: ['Pending', 'Confirmed', 'Completed', 'Cancelled'],
       default: 'Pending',
+    },
+    paymentMethod: {
+      type: String,
+      enum: ['credit_card', 'upi', 'cash'],
+      default: 'credit_card',
     },
     technician: {
       type: String,
       default: 'Pending Assignment',
+    },
+    feedback: {
+      rating: {
+        type: Number,
+        min: 1,
+        max: 5,
+      },
+      comment: {
+        type: String,
+        trim: true,
+        maxlength: 1000,
+      },
+      createdAt: {
+        type: Date,
+      },
     },
   },
   { timestamps: true }

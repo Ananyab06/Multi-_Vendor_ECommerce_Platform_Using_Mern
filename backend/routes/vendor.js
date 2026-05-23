@@ -7,8 +7,9 @@ const vendorAuth = require('../middleware/vendorAuth');
 router.post('/register', vendorController.register);
 router.post('/login', vendorController.login);
 
-// Protected route
+// Protected routes
 router.get('/me', vendorAuth, vendorController.getMe);
+router.put('/me', vendorAuth, vendorController.updateMe);
 
 module.exports = router;
 

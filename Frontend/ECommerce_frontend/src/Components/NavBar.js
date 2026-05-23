@@ -153,13 +153,12 @@ const Navbar = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-wrap items-center justify-center gap-x-10 gap-y-2 font-bold">
           <Link to="/category/Electronics" className="hover:text-gray-300 transition-colors">Electronics</Link>
           <Link to="/category/Fashion" className="hover:text-gray-300 transition-colors">Fashion</Link>
-          <Link to="/category/Home%20%26%20Living" className="hover:text-gray-300 transition-colors">Home & Kitchen</Link>
+          <Link to="/category/Home%20%26%20Living" className="hover:text-gray-300 transition-colors">Home & Living</Link>
           <Link to="/category/Beauty" className="hover:text-gray-300 transition-colors">Beauty</Link>
           <Link to="/category/Sports" className="hover:text-gray-300 transition-colors">Sports</Link>
           <Link to="/category/Toys" className="hover:text-gray-300 transition-colors">Toys</Link>
           <Link to="/category/Groceries" className="hover:text-gray-300 transition-colors">Groceries</Link>
           <Link to="/category/Automotive" className="hover:text-gray-300 transition-colors">Automotive</Link>
-          {!user?.isVendor && <Link to="/services" className="hover:text-gray-300 transition-colors font-medium">Services</Link>}
         </div>
       </div>
 

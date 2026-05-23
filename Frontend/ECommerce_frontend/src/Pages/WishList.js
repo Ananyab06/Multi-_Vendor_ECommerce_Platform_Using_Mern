@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ShoppingCart, Trash2 } from 'lucide-react';
+import { ShoppingCart } from 'lucide-react';
 import { useAppContext } from '../Context/AppContext';
 import { Link } from 'react-router-dom';
 
@@ -33,25 +33,28 @@ const Wishlist = () => {
                 <Link to={`/product/${product.id}`}>
                   <img src={product.image} alt={product.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
                 </Link>
-                <button
-                  onClick={() => handleRemove(product.id)}
-                  disabled={removingId === product.id}
-                  className="absolute top-4 right-4 bg-white/80 backdrop-blur-sm p-2 rounded-full text-red-500 hover:bg-red-500 hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <Trash2 className="h-5 w-5" />
-                </button>
               </div>
               <div>
                 <Link to={`/product/${product.id}`}>
                   <h3 className="text-sm font-semibold text-gray-900 mb-1 line-clamp-2 hover:text-indigo-600">{product.name}</h3>
                 </Link>
-                <p className="text-lg font-bold text-indigo-600 mb-4">₹{product.price.toFixed(2)}</p>
-                <button
-                  onClick={() => addToCart(product, 1, product.sizes?.[0])}
-                  className="w-full py-2 bg-indigo-50 text-indigo-700 rounded-full font-bold hover:bg-indigo-600 hover:text-white transition-colors flex items-center justify-center gap-2"
-                >
-                  <ShoppingCart className="h-4 w-4" /> Add to Cart
-                </button>
+                <p className="text-lg font-bold text-indigo-600 mb-0.5">₹{product.price.toFixed(2)}</p>
+                <p className="text-[10px] text-gray-400 font-medium mb-4">(inc. of all taxes)</p>
+                <div className="flex flex-col gap-2">
+                  <button
+                    onClick={() => addToCart(product, 1, product.sizes?.[0])}
+                    className="w-full py-2 bg-indigo-50 text-indigo-700 rounded-full font-bold hover:bg-indigo-600 hover:text-white transition-colors flex items-center justify-center gap-2"
+                  >
+                    <ShoppingCart className="h-4 w-4" /> Add to Cart
+                  </button>
+                  <button
+                    onClick={() => handleRemove(product.id)}
+                    disabled={removingId === product.id}
+                    className="w-full py-2 bg-gray-50 text-gray-600 rounded-full font-bold hover:bg-red-50 hover:text-red-600 transition-colors flex items-center justify-center gap-2 text-sm disabled:opacity-50"
+                  >
+                    {removingId === product.id ? 'Removing...' : 'Remove from Wishlist'}
+                  </button>
+                </div>
               </div>
             </div>
           ))}

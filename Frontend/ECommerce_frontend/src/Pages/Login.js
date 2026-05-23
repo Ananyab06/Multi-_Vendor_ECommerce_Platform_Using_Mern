@@ -42,6 +42,7 @@ const Login = () => {
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [errors, setErrors] = useState({});
   const navigate = useNavigate();
   const { login, user, authLoading } = useAppContext();
 
@@ -51,6 +52,7 @@ const Login = () => {
     } else {
       setSearchParams({});
     }
+    setErrors({});
   };
 
   useEffect(() => {
@@ -62,14 +64,70 @@ const Login = () => {
     }
   }, [user, authLoading, navigate]);
 
+  const handleIdentifierChange = (e) => {
+    setIdentifier(e.target.value);
+    if (errors.identifier) {
+      setErrors((prev) => {
+        const next = { ...prev };
+        delete next.identifier;
+        return next;
+      });
+    }
+  };
+
+  const handlePasswordChange = (e) => {
+    setPassword(e.target.value);
+    if (errors.password || errors.form) {
+      setErrors((prev) => {
+        const next = { ...prev };
+        delete next.password;
+        delete next.form;
+        return next;
+      });
+    }
+  };
+
+  const handleIdentifierBlur = () => {
+    const trimmedId = identifier.trim();
+    if (trimmedId && !isValidIdentifier(trimmedId)) {
+      setErrors((prev) => ({
+        ...prev,
+        identifier: 'Please enter a valid email address or 10-digit mobile number.',
+      }));
+    }
+  };
+
+  const handlePasswordBlur = () => {
+    if (!password) {
+      setErrors((prev) => ({
+        ...prev,
+        password: 'Password is required.',
+      }));
+    }
+  };
+
   const handleLogin = async (e) => {
     e.preventDefault();
     const trimmedId = identifier.trim();
-    if (!isValidIdentifier(trimmedId)) {
-      alert('Please enter a valid email address or 10-digit mobile number.');
+    const newErrors = {};
+
+    if (!trimmedId) {
+      newErrors.identifier = 'Email or Mobile Number is required.';
+    } else if (!isValidIdentifier(trimmedId)) {
+      newErrors.identifier = 'Please enter a valid email address or 10-digit mobile number.';
+    }
+
+    if (!password) {
+      newErrors.password = 'Password is required.';
+    }
+
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
       return;
     }
+
     setLoading(true);
+    setErrors({});
 
     try {
       const credentials = { identifier: trimmedId, password };
@@ -88,7 +146,14 @@ const Login = () => {
     } catch (err) {
       console.error('Login failed', err);
       const errorMsg = err.response?.data?.message || 'Invalid credentials';
-      alert(`Login failed: ${errorMsg}`);
+      const lowerMsg = errorMsg.toLowerCase();
+      if (lowerMsg.includes('user') || lowerMsg.includes('email') || lowerMsg.includes('mobile') || lowerMsg.includes('identifier') || lowerMsg.includes('found')) {
+        setErrors((prev) => ({ ...prev, identifier: errorMsg }));
+      } else if (lowerMsg.includes('password') || lowerMsg.includes('credential')) {
+        setErrors((prev) => ({ ...prev, password: errorMsg }));
+      } else {
+        setErrors((prev) => ({ ...prev, form: errorMsg }));
+      }
     } finally {
       setLoading(false);
     }
@@ -118,10 +183,15 @@ const Login = () => {
             className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors"
             placeholder={isVendor ? 'vendor@example.com or 9876543210' : 'john@example.com or 9876543210'}
             value={identifier}
-            onChange={(e) => setIdentifier(e.target.value)}
+            onChange={handleIdentifierChange}
+            onBlur={handleIdentifierBlur}
             autoComplete="username"
           />
-          <p className="mt-1 text-xs text-gray-500">Use your registered email or 10-digit mobile number</p>
+          {errors.identifier ? (
+            <p className="mt-1 text-sm text-red-500 font-medium">{errors.identifier}</p>
+          ) : (
+            <p className="mt-1 text-xs text-gray-500">Use your registered email or 10-digit mobile number</p>
+          )}
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">Password</label>
@@ -131,10 +201,20 @@ const Login = () => {
             className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors"
             placeholder="Enter your password"
             value={password}
-            onChange={(e) => setPassword(e.target.value)}
+            onChange={handlePasswordChange}
+            onBlur={handlePasswordBlur}
             autoComplete="current-password"
           />
+          {errors.password && (
+            <p className="mt-1 text-sm text-red-500 font-medium">{errors.password}</p>
+          )}
         </div>
+
+        {errors.form && (
+          <div className="p-3 bg-red-50 text-red-700 text-sm font-medium rounded-lg border border-red-200">
+            {errors.form}
+          </div>
+        )}
 
         <button
           type="submit"
@@ -161,3 +241,4 @@ const Login = () => {
 };
 
 export default Login;
+

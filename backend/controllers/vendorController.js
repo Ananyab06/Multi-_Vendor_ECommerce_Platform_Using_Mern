@@ -23,7 +23,7 @@ const generateToken = (id) => {
 // Register vendor
 exports.register = async (req, res) => {
   try {
-    const { name, email, password, storeName, mobile } = req.body;
+    const { name, email, password, storeName, mobile, gstNumber } = req.body;
 
     if (!mobile || !MOBILE_REGEX.test(mobile)) {
       return res.status(400).json({ message: 'A valid 10-digit mobile number is required' });
@@ -47,6 +47,7 @@ exports.register = async (req, res) => {
       password,
       storeName,
       mobile,
+      gstNumber: gstNumber ? gstNumber.trim() : 'NA',
     });
 
     await vendor.save();
@@ -63,6 +64,7 @@ exports.register = async (req, res) => {
         email: vendor.email,
         mobile: vendor.mobile,
         storeName: vendor.storeName,
+        gstNumber: vendor.gstNumber,
         isVendor: true,
       },
     });
@@ -105,6 +107,7 @@ exports.login = async (req, res) => {
         email: vendor.email,
         mobile: vendor.mobile,
         storeName: vendor.storeName,
+        gstNumber: vendor.gstNumber || 'NA',
         isVendor: true, 
       },
     });
@@ -122,6 +125,55 @@ exports.getMe = async (req, res) => {
       return res.status(404).json({ message: 'Vendor not found' });
     }
     res.json(vendor);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// Update current vendor profile (protected)
+exports.updateMe = async (req, res) => {
+  try {
+    const { name, storeName, email, mobile, gstNumber } = req.body;
+    const vendor = await Vendor.findById(req.vendor.id);
+    if (!vendor) {
+      return res.status(404).json({ message: 'Vendor not found' });
+    }
+
+    if (email && email.toLowerCase() !== vendor.email.toLowerCase()) {
+      const emailExists = await Vendor.findOne({ email: email.toLowerCase() });
+      if (emailExists) {
+        return res.status(400).json({ message: 'Email already in use by another vendor' });
+      }
+      vendor.email = email.toLowerCase();
+    }
+
+    if (mobile && mobile !== vendor.mobile) {
+      const mobileExists = await Vendor.findOne({ mobile });
+      if (mobileExists) {
+        return res.status(400).json({ message: 'Mobile number already in use by another vendor' });
+      }
+      vendor.mobile = mobile;
+    }
+
+    if (name) vendor.name = name;
+    if (storeName) vendor.storeName = storeName;
+    if (gstNumber !== undefined) vendor.gstNumber = gstNumber.trim() || 'NA';
+
+    await vendor.save();
+
+    res.json({
+      message: 'Profile updated successfully',
+      vendor: {
+        id: vendor._id,
+        name: vendor.name,
+        email: vendor.email,
+        mobile: vendor.mobile,
+        storeName: vendor.storeName,
+        gstNumber: vendor.gstNumber,
+        isVendor: true,
+      }
+    });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Server error' });

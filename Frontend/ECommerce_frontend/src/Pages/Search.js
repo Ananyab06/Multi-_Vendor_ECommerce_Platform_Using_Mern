@@ -2,6 +2,7 @@ import React, { useMemo } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import { Star, ShoppingCart, Heart, Calendar } from 'lucide-react';
 import { useAppContext } from '../Context/AppContext';
+import { getProductDiscountInfo } from '../utils/discount';
 
 const Search = () => {
   const [searchParams] = useSearchParams();
@@ -70,7 +71,9 @@ const Search = () => {
                 <Link to={isProduct ? `/product/${item.id}` : '/services'} className="block relative aspect-square overflow-hidden rounded-xl mb-4 bg-gray-100 flex-shrink-0">
                   <img src={item.image} alt={item.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
                   {!isProduct && (
-                    <div className="absolute top-2 left-2 bg-teal-600 text-white text-[10px] font-bold px-2 py-1 rounded-full uppercase">Service</div>
+                    <div className={`absolute top-2 left-2 text-white text-[10px] font-bold px-2 py-1 rounded-full uppercase ${item.isActive === false ? 'bg-rose-600' : 'bg-indigo-600'}`}>
+                      Service {item.isActive === false ? '(Inactive)' : ''}
+                    </div>
                   )}
                 </Link>
 
@@ -83,22 +86,48 @@ const Search = () => {
                     <h3 className="text-sm font-semibold text-gray-900 mb-1 line-clamp-2 hover:text-indigo-600 transition-colors">{item.name}</h3>
                   </Link>
                   <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">{isProduct ? 'Sold by' : 'Provided by'} {item.vendor}</p>
-                  <div className="mt-auto pt-3 flex items-center justify-between">
-                    <p className="text-lg font-bold text-indigo-600">
-                      {!isProduct ? 'From ' : ''}₹{Number(item.price || 0).toFixed(2)}
-                    </p>
+                  <div className="mt-auto pt-3 flex items-end justify-between gap-2">
+                    {isProduct ? (
+                      (() => {
+                        const { hasDiscount, discountPercent, originalPrice } = getProductDiscountInfo(item);
+                        return (
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-baseline gap-1 flex-wrap">
+                              {hasDiscount && (
+                                <span className="text-red-500 text-xs font-black">-{discountPercent}%</span>
+                              )}
+                              <span className="text-sm font-black text-indigo-600">
+                                ₹{Number(item.price || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                              </span>
+                            </div>
+                            {hasDiscount && (
+                              <p className="text-[9px] text-gray-400 line-through truncate">M.R.P. ₹{Number(originalPrice).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</p>
+                            )}
+                            <p className="text-[8px] text-gray-400 font-bold tracking-tight uppercase">(inc. of all taxes)</p>
+                          </div>
+                        );
+                      })()
+                    ) : (
+                      <p className="text-lg font-bold text-indigo-600">
+                        From ₹{Number(item.price || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                      </p>
+                    )}
                     {isProduct ? (
                       !user?.isVendor && (
                         <button 
                           onClick={() => addToCart(item, 1, item.sizes?.[0])}
-                          className="bg-indigo-50 p-2 rounded-full text-indigo-600 hover:bg-indigo-600 hover:text-white transition-colors"
+                          className="bg-indigo-50 p-2 rounded-xl text-indigo-600 hover:bg-indigo-600 hover:text-white transition-all duration-300 flex-shrink-0"
                           title="Add to Cart"
                         >
                           <ShoppingCart className="h-4 w-4" />
                         </button>
                       )
+                    ) : item.isActive === false ? (
+                      <span className="text-xs font-bold text-rose-500 bg-rose-50 px-2 py-1 rounded-full flex-shrink-0">
+                        Inactive
+                      </span>
                     ) : (
-                      <Link to="/services" className="bg-teal-50 p-2 rounded-full text-teal-600 hover:bg-teal-600 hover:text-white transition-colors">
+                      <Link to="/services" className="bg-indigo-50 p-2 rounded-xl text-indigo-600 hover:bg-indigo-600 hover:text-white transition-all duration-300 flex-shrink-0">
                         <Calendar className="h-4 w-4" />
                       </Link>
                     )}

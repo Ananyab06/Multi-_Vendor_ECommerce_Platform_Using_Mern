@@ -16,6 +16,10 @@ const serviceSchema = new mongoose.Schema(
       required: true,
       min: 0,
     },
+    originalPrice: {
+      type: Number,
+      min: 0,
+    },
     image: {
       type: String,
       default: '',
@@ -39,6 +43,10 @@ const serviceSchema = new mongoose.Schema(
       type: Number,
       default: 0,
       min: 0,
+    },
+    isActive: {
+      type: Boolean,
+      default: true,
     },
   },
   { timestamps: true }

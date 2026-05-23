@@ -30,6 +30,11 @@ const vendorSchema = new mongoose.Schema({
     required: true,
     trim: true,
   },
+  gstNumber: {
+    type: String,
+    default: 'NA',
+    trim: true,
+  },
 }, { timestamps: true });
 
 // Hash password before saving

@@ -2,6 +2,7 @@ import React, { useRef, useState, useEffect } from 'react';
 import { Star, ShoppingCart, Heart, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAppContext } from '../Context/AppContext';
+import { getProductDiscountInfo } from '../utils/discount';
 
 const dynamicBanners = [
   {
@@ -272,12 +273,30 @@ const Home = () => {
                     <h3 className="text-sm font-bold text-gray-900 mb-1 line-clamp-2 hover:text-indigo-600 transition-colors">{product.name}</h3>
                   </Link>
                   <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">Sold by {product.vendor}</p>
-                  <div className="mt-auto pt-3 flex items-center justify-between">
-                    <p className="text-lg font-black text-indigo-600">₹{Number(product.price || 0).toFixed(2)}</p>
+                  <div className="mt-auto pt-3 flex items-end justify-between gap-2">
+                    {(() => {
+                      const { hasDiscount, discountPercent, originalPrice } = getProductDiscountInfo(product);
+                      return (
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-baseline gap-1 flex-wrap">
+                            {hasDiscount && (
+                              <span className="text-red-500 text-xs font-black">-{discountPercent}%</span>
+                            )}
+                            <span className="text-sm font-black text-indigo-600">
+                              ₹{Number(product.price || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                            </span>
+                          </div>
+                          {hasDiscount && (
+                            <p className="text-[9px] text-gray-400 line-through truncate">M.R.P. ₹{Number(originalPrice).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</p>
+                          )}
+                          <p className="text-[8px] text-gray-400 font-bold tracking-tight uppercase">(inc. of all taxes)</p>
+                        </div>
+                      );
+                    })()}
                     {!user?.isVendor && (
                       <button 
                         onClick={() => addToCart(product, 1, product.sizes?.[0])}
-                        className="bg-indigo-50 p-2.5 rounded-xl text-indigo-600 hover:bg-indigo-600 hover:text-white transition-all duration-300"
+                        className="bg-indigo-50 p-2 rounded-xl text-indigo-600 hover:bg-indigo-600 hover:text-white transition-all duration-300 flex-shrink-0"
                         title="Add to Cart"
                       >
                         <ShoppingCart className="h-4 w-4" />

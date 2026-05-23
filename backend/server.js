@@ -10,7 +10,7 @@ const { initSocket } = require('./socket');
 dotenv.config();
 
 const app = express();
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 5001;
 
 // Middleware
 app.use(cors());
@@ -57,4 +57,5 @@ initSocket(server);
 server.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
+ 
 

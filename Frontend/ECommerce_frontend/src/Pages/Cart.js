@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Trash2, CreditCard, MapPin, CheckCircle, Truck, Wallet } from 'lucide-react';
 import { useAppContext } from '../Context/AppContext';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { getAddresses, addAddress as saveAddressApi } from '../api';
 
 const initialAddressForm = { name: '', street: '', city: '', state: '', zip: '' };
@@ -174,7 +174,7 @@ const AddressField = ({ label, name, value, onChange, error, placeholder, ...inp
 );
 
 const Cart = () => {
-  const { cart, removeFromCart, updateCartQuantity, updateCartItemSize, setCart, addOrder, user, products } = useAppContext();
+  const { cart, removeFromCart, updateCartQuantity, updateCartItemSize, setCart, addOrder, user, products, orders, showToast } = useAppContext();
   const [checkoutStep, setCheckoutStep] = useState('cart'); // 'cart', 'address', 'payment', 'success'
   const [addresses, setAddresses] = useState([]);
   const [selectedAddress, setSelectedAddress] = useState(null);
@@ -187,7 +187,27 @@ const Cart = () => {
   const [paymentErrors, setPaymentErrors] = useState({});
   const navigate = useNavigate();
 
+  const [mockOrderDetails] = useState(() => {
+    const d = new Date();
+    const formattedDate = d.toLocaleDateString('en-IN', {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric'
+    });
+    const p1 = Math.floor(100 + Math.random() * 900);
+    const p2 = Math.floor(1000000 + Math.random() * 9000000);
+    const p3 = Math.floor(1000000 + Math.random() * 9000000);
+    return { date: formattedDate, number: `${p1}-${p2}-${p3}` };
+  });
+
+  const shipping = cart.length > 0 ? 68.00 : 0;
+  const platformFee = cart.length > 0 ? 1.95 : 0;
   const total = cart.reduce((acc, item) => acc + item.price * item.quantity, 0);
+
+  const isFirstOrder = orders.length === 0;
+  const hasFashionItem = cart.some(item => item.category?.toLowerCase() === 'fashion');
+  const fashionDiscount = (isFirstOrder && hasFashionItem && total > 0) ? Math.min(200, total) : 0;
+  const finalTotal = total + shipping + platformFee - fashionDiscount;
 
   const handleAddressFieldChange = (e) => {
     const { name, value } = e.target;
@@ -270,7 +290,7 @@ const Cart = () => {
       setAddressErrors({});
     } catch (err) {
       console.error('Failed to save address', err);
-      alert(err.response?.data?.message || 'Failed to save address. Please try again.');
+      showToast(err.response?.data?.message || 'Failed to save address. Please try again.', 'error');
     } finally {
       setSavingAddress(false);
     }
@@ -278,7 +298,7 @@ const Cart = () => {
 
   const handleProceedToPayment = () => {
     if (!selectedAddress || !addresses.find((addr) => addr.id === selectedAddress)) {
-      alert('Please save and select a delivery address first.');
+      showToast('Please save and select a delivery address first.', 'error');
       return;
     }
     setCheckoutStep('payment');
@@ -316,7 +336,7 @@ const Cart = () => {
 
     const cardDigits = (paymentForm.cardNumber || '').replace(/\D/g, '');
     if (paymentMethod === 'cc' && cardDigits === '0000000000000000') {
-      alert('Payment Failed: Your card was declined. Please try again with a different card.');
+      showToast('Payment Failed: Your card was declined. Please try again with a different card.', 'error');
       navigate('/');
       return;
     }
@@ -329,7 +349,7 @@ const Cart = () => {
         const d = new Date();
         return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
       })(),
-      total: total,
+      total: finalTotal,
       status: 'Processing',
       customer: {
         name: user?.name || 'Guest User',
@@ -354,7 +374,7 @@ const Cart = () => {
     if (result.success) {
       setCheckoutStep('success');
     } else {
-      alert(`Order failed: ${result.error}`);
+      showToast(`Order failed: ${result.error}`, 'error');
     }
   };
 
@@ -392,9 +412,16 @@ const Cart = () => {
     return (
       <div className="max-w-2xl mx-auto bg-white p-8 rounded-3xl shadow-sm border border-gray-100 mt-8">
         <h2 className="text-2xl font-bold mb-6 flex items-center gap-2"><CreditCard /> Payment Gateway</h2>
-        <div className="mb-8 p-4 bg-indigo-50 rounded-xl text-indigo-900 font-bold flex justify-between items-center text-lg">
-          <span>Amount to Pay</span>
-          <span>₹{total.toFixed(2)}</span>
+        <div className="mb-8 p-4 bg-indigo-50 rounded-xl text-indigo-900 font-bold flex flex-col gap-2 text-lg">
+          <div className="flex justify-between items-center">
+            <span>Amount to Pay</span>
+            <span>₹{finalTotal.toFixed(2)}</span>
+          </div>
+          {fashionDiscount > 0 && (
+            <div className="flex justify-between items-center text-xs text-green-600 font-bold">
+              <span>(Includes First Order Fashion Discount of ₹200)</span>
+            </div>
+          )}
         </div>
 
         <form onSubmit={handleCheckout} className="space-y-8" noValidate>
@@ -609,10 +636,20 @@ const Cart = () => {
           <div className="md:col-span-2 space-y-4">
             {cart.map((item, index) => (
               <div key={`${item.id}-${item.size || index}`} className="flex items-center gap-4 bg-white p-4 rounded-2xl shadow-sm border border-gray-100">
-                <img src={item.image} alt={item.name} className="w-24 h-24 object-cover rounded-xl" />
+                <Link to={`/product/${item.id}`}>
+                  <img src={item.image} alt={item.name} className="w-24 h-24 object-cover rounded-xl cursor-pointer hover:opacity-85 transition-opacity" />
+                </Link>
                 <div className="flex-1">
                   <h3 className="text-lg font-semibold text-gray-900">{item.name}</h3>
-                  <p className="text-indigo-600 font-bold">₹{item.price.toFixed(2)}</p>
+                  <div className="flex items-baseline gap-1.5 flex-wrap">
+                    <span className="text-indigo-600 font-bold">₹{item.price.toFixed(2)}</span>
+                    {item.originalPrice && item.originalPrice > item.price && (
+                      <>
+                        <span className="text-[10px] text-gray-400 line-through">₹{item.originalPrice.toFixed(2)}</span>
+                        <span className="text-[9px] font-black text-red-500">({Math.round(((item.originalPrice - item.price) / item.originalPrice) * 100)}% OFF)</span>
+                      </>
+                    )}
+                  </div>
                   <div className="mt-2 flex items-center justify-between">
                     <div className="flex items-center gap-4">
                       <div className="flex items-center border rounded-lg bg-gray-50">
@@ -653,19 +690,37 @@ const Cart = () => {
           </div>
           
           <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 h-fit sticky top-24">
-            <h3 className="text-xl font-bold text-gray-900 mb-4">Order Summary</h3>
-            <div className="space-y-3 text-gray-600 mb-6">
+            <h3 className="text-xl font-bold text-gray-900 mb-2">Order summary</h3>
+            <div className="text-sm font-medium text-gray-500 mb-6 space-y-1">
+              <p>Order placed {mockOrderDetails.date}</p>
+              <p>Order number {mockOrderDetails.number}</p>
+            </div>
+            <div className="space-y-3 text-gray-600 mb-6 font-medium">
               <div className="flex justify-between">
-                <span>Subtotal</span>
+                <span>Item(s) Subtotal:</span>
                 <span>₹{total.toFixed(2)}</span>
               </div>
               <div className="flex justify-between">
-                <span>Shipping</span>
-                <span>Free</span>
+                <span>Shipping:</span>
+                <span>₹{shipping.toFixed(2)}</span>
               </div>
-              <div className="border-t pt-3 flex justify-between text-lg font-bold text-gray-900">
-                <span>Total</span>
-                <span>₹{total.toFixed(2)}</span>
+              <div className="flex justify-between">
+                <span>Marketplace Fee:</span>
+                <span>₹{platformFee.toFixed(2)}</span>
+              </div>
+              {fashionDiscount > 0 && (
+                <div className="flex justify-between text-green-600 font-semibold">
+                  <span>First Order Fashion Discount:</span>
+                  <span>-₹{fashionDiscount.toFixed(2)}</span>
+                </div>
+              )}
+              <div className="border-t pt-3 flex justify-between text-base font-bold text-gray-950">
+                <span>Total:</span>
+                <span>₹{finalTotal.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between text-lg font-black text-gray-950">
+                <span>Grand Total:</span>
+                <span>₹{finalTotal.toFixed(2)}</span>
               </div>
             </div>
             <button 

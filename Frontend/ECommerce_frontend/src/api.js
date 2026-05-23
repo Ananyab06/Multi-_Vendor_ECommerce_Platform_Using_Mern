@@ -25,6 +25,7 @@ export const getCurrentUser = () => API.get('/auth/me');
 export const registerVendor = (vendorData) => API.post('/vendor/register', vendorData);
 export const loginVendor = (credentials) => API.post('/vendor/login', credentials);
 export const getCurrentVendor = () => API.get('/vendor/me');
+export const updateVendorProfile = (vendorData) => API.put('/vendor/me', vendorData);
 
 // Upload APIs
 export const uploadImage = (formData) =>
@@ -80,5 +81,7 @@ export const getUserServiceBookings = () => API.get('/bookings/user');
 export const getVendorServiceBookings = (vendorId) => API.get(`/bookings/vendor/${vendorId}`);
 export const updateServiceBookingStatus = (bookingId, status) =>
   API.patch(`/bookings/${bookingId}/status`, { status });
+export const submitServiceBookingFeedback = (bookingId, feedback) =>
+  API.post(`/bookings/${bookingId}/feedback`, feedback);
 
 export default API;

@@ -13,7 +13,7 @@ const timeSlots = [
 const Services = () => {
   const [bookingModal, setBookingModal] = useState(null);
   const [submitting, setSubmitting] = useState(false);
-  const { serviceBookings, addServiceBooking, services, user } = useAppContext();
+  const { serviceBookings, addServiceBooking, services, user, showToast } = useAppContext();
   const today = new Date().toISOString().split('T')[0];
 
   useEffect(() => {
@@ -27,7 +27,7 @@ const Services = () => {
 
   const handleBook = (service) => {
     if (!user || user.isVendor) {
-      alert('Please login as a customer to book a service.');
+      showToast('Please login as a customer to book a service.', 'error');
       return;
     }
     setBookingModal(service);
@@ -36,7 +36,7 @@ const Services = () => {
   const confirmBooking = async (e) => {
     e.preventDefault();
     if (!user || user.isVendor) {
-      alert('Please login as a customer to book a service.');
+      showToast('Please login as a customer to book a service.', 'error');
       return;
     }
 
@@ -44,6 +44,7 @@ const Services = () => {
     const date = formData.get('date');
     const slot = formData.get('slot');
     const address = formData.get('address');
+    const paymentMethod = formData.get('paymentMethod');
 
     setSubmitting(true);
     const result = await addServiceBooking({
@@ -53,13 +54,12 @@ const Services = () => {
       date,
       slot,
       address,
+      paymentMethod,
     });
     setSubmitting(false);
 
     if (result.success) {
-      alert(
-        `Successfully booked: ${bookingModal.name} on ${date} at ${slot}! Our technician will contact you shortly.`
-      );
+      showToast(`Successfully booked: ${bookingModal.name} on ${date} at ${slot}!`, 'success');
       setBookingModal(null);
     }
   };
@@ -126,19 +126,23 @@ const Services = () => {
 
             return (
               <div id={`service-${service.id}`} key={service.id} className="bg-white rounded-2xl p-4 shadow-sm hover:shadow-xl transition-all duration-300 border border-gray-100 flex flex-col group relative">
-                {isBooked && (
+                {isBooked ? (
                   <div
                     className={`absolute top-6 right-6 z-10 px-3 py-1 rounded-full text-xs font-bold shadow-sm flex items-center gap-1 ${
                       isBooked.status === 'Pending'
                         ? 'bg-amber-100 text-amber-700'
                         : isBooked.status === 'Confirmed'
-                        ? 'bg-teal-100 text-teal-700'
+                        ? 'bg-indigo-100 text-indigo-700'
                         : 'bg-emerald-100 text-emerald-700'
                     }`}
                   >
                     <CheckCircle2 className="h-3 w-3" /> {isBooked.status}
                   </div>
-                )}
+                ) : service.isActive === false ? (
+                  <div className="absolute top-6 right-6 z-10 px-3 py-1 rounded-full text-xs font-bold shadow-sm bg-rose-100 text-rose-700">
+                    Inactive
+                  </div>
+                ) : null}
                 <div className="relative aspect-video overflow-hidden rounded-xl mb-4">
                   <img src={service.image} alt={service.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
                 </div>
@@ -158,15 +162,19 @@ const Services = () => {
                     </div>
                   )}
                   <div className="mt-auto flex items-center justify-between pt-4 border-t border-gray-100">
-                    <span className="text-lg font-bold text-teal-700">₹{service.price}</span>
+                    <span className="text-lg font-bold text-indigo-600">₹{service.price}</span>
                     {isBooked ? (
                       <span className="flex items-center gap-2 bg-gray-100 text-gray-500 px-4 py-2 rounded-full text-sm font-bold">
                         Booked
                       </span>
+                    ) : service.isActive === false ? (
+                      <span className="flex items-center gap-2 bg-rose-50 text-rose-500 px-4 py-2 rounded-full text-sm font-bold">
+                        Inactive
+                      </span>
                     ) : (
                       <button
                         onClick={() => handleBook(service)}
-                        className="flex items-center gap-2 bg-teal-600 text-white px-4 py-2 rounded-full text-sm font-bold hover:bg-teal-700 transition-colors"
+                        className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-full text-sm font-bold hover:bg-indigo-700 transition-colors"
                       >
                         <Calendar className="h-4 w-4" /> Book
                       </button>
@@ -224,10 +232,18 @@ const Services = () => {
                   placeholder="Enter your full address"
                 />
               </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Payment Method</label>
+                <select name="paymentMethod" required className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-500 outline-none">
+                  <option value="credit_card">Credit / Debit Card</option>
+                  <option value="upi">UPI</option>
+                  <option value="cash">Cash on Delivery</option>
+                </select>
+              </div>
               <button
                 type="submit"
                 disabled={submitting}
-                className="w-full bg-teal-600 hover:bg-teal-700 text-white font-bold py-3 rounded-xl transition-colors mt-4 disabled:opacity-50"
+                className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-xl transition-colors mt-4 disabled:opacity-50"
               >
                 {submitting ? 'Booking...' : 'Confirm Booking'}
               </button>

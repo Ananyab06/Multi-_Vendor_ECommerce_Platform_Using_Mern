@@ -72,9 +72,12 @@ const Profile = () => {
   const [activeTab, setActiveTab] = useState('orders');
   const [expandedOrder, setExpandedOrder] = useState(null);
   const [feedbackOrder, setFeedbackOrder] = useState(null);
+  const [feedbackService, setFeedbackService] = useState(null);
   const [feedbackRating, setFeedbackRating] = useState(5);
   const [feedbackComment, setFeedbackComment] = useState('');
   const [submittingFeedback, setSubmittingFeedback] = useState(false);
+  const [cancelOrderModal, setCancelOrderModal] = useState(null);
+  const [cancelBookingModal, setCancelBookingModal] = useState(null);
   
   // Pagination states
   const [ordersPage, setOrdersPage] = useState(1);
@@ -85,7 +88,7 @@ const Profile = () => {
   const [servicesDateTo, setServicesDateTo] = useState('');
   const ITEMS_PER_PAGE = 3;
 
-  const { user, logout, serviceBookings, orders, services, submitOrderFeedback } = useAppContext();
+  const { user, logout, serviceBookings, orders, services, submitOrderFeedback, submitServiceBookingFeedback, showToast, updateOrderStatus, updateServiceBookingStatus } = useAppContext();
   const navigate = useNavigate();
 
   const goToProduct = (productId, e) => {
@@ -127,7 +130,7 @@ const Profile = () => {
       } else if (err.response?.data?.message) {
         message = err.response.data.message;
       }
-      alert(message);
+      showToast(message, 'error');
     }
   };
 
@@ -169,10 +172,42 @@ const Profile = () => {
     setSubmittingFeedback(false);
 
     if (result.success) {
-      alert('Thank you for your feedback!');
+      showToast('Thank you for your feedback!', 'success');
       closeFeedbackModal();
     } else {
-      alert(result.error || 'Failed to submit feedback');
+      showToast(result.error || 'Failed to submit feedback', 'error');
+    }
+  };
+
+  const openServiceFeedbackModal = (service, e) => {
+    e?.stopPropagation();
+    setFeedbackService(service);
+    setFeedbackRating(5);
+    setFeedbackComment('');
+  };
+
+  const closeServiceFeedbackModal = () => {
+    setFeedbackService(null);
+    setFeedbackRating(5);
+    setFeedbackComment('');
+  };
+
+  const handleSubmitServiceFeedback = async (e) => {
+    e.preventDefault();
+    if (!feedbackService) return;
+
+    setSubmittingFeedback(true);
+    const result = await submitServiceBookingFeedback(feedbackService.id, {
+      rating: feedbackRating,
+      comment: feedbackComment,
+    });
+    setSubmittingFeedback(false);
+
+    if (result.success) {
+      showToast('Thank you for your feedback!', 'success');
+      closeServiceFeedbackModal();
+    } else {
+      showToast(result.error || 'Failed to submit feedback', 'error');
     }
   };
 
@@ -271,7 +306,13 @@ const Profile = () => {
                         >
                           <div className="mb-4 sm:mb-0 flex-1">
                             <div className="flex items-center gap-3 mb-2">
-                              <span className="font-bold text-gray-900">{order.id}</span>
+                              <span className="font-bold text-gray-900">
+                                {order.items && order.items.length > 0
+                                  ? order.items.length > 1
+                                    ? `${order.items[0].name} and more`
+                                    : order.items[0].name
+                                  : 'No Items'}
+                              </span>
                               <span className={`px-3 py-1 rounded-full text-xs font-bold tracking-wide capitalize ${
                                 isDelivered(order.status) ? 'bg-green-100 text-green-700' :
                                 order.status === 'cancelled' || order.status === 'Cancelled' ? 'bg-red-100 text-red-700' :
@@ -281,7 +322,12 @@ const Profile = () => {
                                 {order.status}
                               </span>
                             </div>
-                            <p className="text-gray-500 text-sm">Placed on {order.date} • {order.itemsCount} Items</p>
+                            <p className="text-gray-500 text-sm">Order #: {order.orderNumber || '404-3787682-9088333'} • Placed on {order.date} • {order.itemsCount} Items</p>
+                            {String(order.status).toLowerCase() === 'cancelled' && (order.paymentMethod === 'upi' || order.paymentMethod === 'cc' || order.paymentMethod === 'credit_card') && (
+                              <p className="text-xs text-red-600 font-bold mt-1">
+                                Payment will be refunded in 2-3 business days
+                              </p>
+                            )}
                           </div>
                           <div className="flex items-center gap-3 flex-wrap justify-end">
                             <span className="text-xl font-bold text-gray-900">₹{order.total.toFixed(2)}</span>
@@ -291,10 +337,21 @@ const Profile = () => {
                             >
                               <Download className="h-4 w-4" /> Invoice
                             </button>
+                            {String(order.status).toLowerCase() !== 'shipped' && String(order.status).toLowerCase() !== 'delivered' && String(order.status).toLowerCase() !== 'cancelled' && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setCancelOrderModal(order);
+                                }}
+                                className="flex items-center gap-2 text-red-600 hover:text-red-800 font-medium bg-red-50 hover:bg-red-100 px-4 py-2 rounded-full transition-colors"
+                              >
+                                Cancel Order
+                              </button>
+                            )}
                             {isDelivered(order.status) && !order.feedback && (
                               <button
                                 onClick={(e) => openFeedbackModal(order, e)}
-                                className="flex items-center gap-2 text-teal-700 hover:text-teal-900 font-medium bg-teal-50 hover:bg-teal-100 px-4 py-2 rounded-full transition-colors"
+                                className="flex items-center gap-2 text-indigo-700 hover:text-indigo-900 font-medium bg-indigo-50 hover:bg-indigo-100 px-4 py-2 rounded-full transition-colors"
                               >
                                 <MessageSquare className="h-4 w-4" /> Give Feedback
                               </button>
@@ -328,8 +385,8 @@ const Profile = () => {
                               <span>₹{order.total.toFixed(2)}</span>
                             </div>
                             {order.feedback && (
-                              <div className="mt-4 p-4 bg-teal-50 rounded-xl border border-teal-100">
-                                <p className="text-sm font-bold text-teal-800 mb-2">Your Feedback</p>
+                              <div className="mt-4 p-4 bg-indigo-50 rounded-xl border border-indigo-100">
+                                <p className="text-sm font-bold text-indigo-800 mb-2">Your Feedback</p>
                                 <div className="flex items-center gap-1 mb-2">
                                   {[1, 2, 3, 4, 5].map((star) => (
                                     <Star
@@ -405,23 +462,77 @@ const Profile = () => {
                 <>
                   <div className="space-y-4 max-h-[600px] overflow-y-auto pr-2 custom-scrollbar">
                     {paginatedServices.map((service) => (
-                      <div key={service.id} className="flex flex-col sm:flex-row sm:items-center justify-between bg-white p-6 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow">
-                        <div className="mb-4 sm:mb-0">
-                          <div className="flex items-center gap-3 mb-2">
-                            <button
-                              type="button"
-                              onClick={() => goToService(service.name)}
-                              className="font-bold text-gray-900 hover:text-indigo-600 hover:underline text-left"
-                            >
-                              {service.name}
-                            </button>
-                            <span className="px-3 py-1 bg-green-100 text-green-700 rounded-full text-xs font-bold tracking-wide">{service.status}</span>
+                      <div key={service.id} className="flex flex-col bg-white p-6 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-all">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between">
+                          <div className="mb-4 sm:mb-0">
+                            <div className="flex items-center gap-3 mb-2">
+                              <button
+                                type="button"
+                                onClick={() => goToService(service.name)}
+                                className="font-bold text-gray-900 hover:text-indigo-600 hover:underline text-left text-base"
+                              >
+                                {service.name}
+                              </button>
+                              <span className={`px-3 py-1 rounded-full text-xs font-bold tracking-wide ${
+                                service.status === 'Completed' 
+                                  ? 'bg-green-100 text-green-700' 
+                                  : service.status === 'Confirmed' 
+                                    ? 'bg-blue-100 text-blue-700' 
+                                    : service.status === 'Cancelled'
+                                      ? 'bg-red-100 text-red-700'
+                                      : 'bg-yellow-100 text-yellow-700'
+                              }`}>{service.status}</span>
+                            </div>
+                            <p className="text-gray-500 text-sm">Date: {service.date} ({service.slot}) • Tech: {service.technician}</p>
+                            {String(service.status).toLowerCase() === 'cancelled' && (service.paymentMethod === 'upi' || service.paymentMethod === 'cc' || service.paymentMethod === 'credit_card') && (
+                              <p className="text-xs text-red-600 font-bold mt-1">
+                                Payment will be refunded in 2-3 business days
+                              </p>
+                            )}
                           </div>
-                          <p className="text-gray-500 text-sm">Date: {service.date} ({service.slot}) • Tech: {service.technician}</p>
+                          <div className="flex items-center gap-6">
+                            {String(service.status).toLowerCase() !== 'completed' && String(service.status).toLowerCase() !== 'cancelled' && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setCancelBookingModal(service);
+                                }}
+                                className="flex items-center gap-2 text-red-600 hover:text-red-800 font-medium bg-red-50 hover:bg-red-100 px-4 py-2 rounded-full transition-colors"
+                              >
+                                Cancel Booking
+                              </button>
+                            )}
+                            {String(service.status).toLowerCase() === 'completed' && !service.feedback && (
+                              <button
+                                onClick={(e) => openServiceFeedbackModal(service, e)}
+                                className="flex items-center gap-2 text-indigo-700 hover:text-indigo-900 font-medium bg-indigo-50 hover:bg-indigo-100 px-4 py-2 rounded-full transition-colors"
+                              >
+                                <MessageSquare className="h-4 w-4" /> Give Feedback
+                              </button>
+                            )}
+                          </div>
                         </div>
-                        <div className="flex items-center gap-6">
-                           <span className="text-sm font-medium text-gray-500 bg-gray-50 px-3 py-1 rounded-lg border border-gray-200">ID: {service.id}</span>
-                        </div>
+
+                        {service.feedback && (
+                          <div className="mt-4 p-4 bg-indigo-50/50 rounded-xl border border-indigo-100/50">
+                            <p className="text-xs font-black uppercase tracking-wider text-indigo-600 mb-2">Your Feedback</p>
+                            <div className="flex items-center gap-1 mb-2">
+                              {[1, 2, 3, 4, 5].map((star) => (
+                                <Star
+                                  key={star}
+                                  className={`h-4 w-4 ${
+                                    star <= service.feedback.rating
+                                      ? 'fill-yellow-400 text-yellow-400'
+                                      : 'text-gray-300'
+                                  }`}
+                                />
+                              ))}
+                            </div>
+                            {service.feedback.comment && (
+                              <p className="text-sm text-gray-700 italic">"{service.feedback.comment}"</p>
+                            )}
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -489,7 +600,7 @@ const Profile = () => {
                       />
                     </button>
                   ))}
-                            </div>
+                </div>
               </div>
               <div>
                 <label htmlFor="feedback-comment" className="block text-sm font-semibold text-gray-700 mb-2">
@@ -508,11 +619,135 @@ const Profile = () => {
               <button
                 type="submit"
                 disabled={submittingFeedback}
-                className="w-full py-3 bg-teal-600 hover:bg-teal-700 text-white font-bold rounded-xl transition-colors disabled:opacity-50"
+                className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl transition-colors disabled:opacity-50"
               >
                 {submittingFeedback ? 'Submitting...' : 'Submit Feedback'}
               </button>
             </form>
+          </div>
+        </div>
+      )}
+
+      {feedbackService && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl p-8 w-full max-w-md relative shadow-xl">
+            <button
+              type="button"
+              onClick={closeServiceFeedbackModal}
+              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 bg-gray-50 hover:bg-gray-100 p-2 rounded-full transition-colors"
+            >
+              <X className="h-5 w-5" />
+            </button>
+            <h3 className="text-2xl font-bold text-gray-900 mb-1">Rate Your Service</h3>
+            <p className="text-sm text-gray-500 mb-6">{feedbackService.name}</p>
+
+            <form onSubmit={handleSubmitServiceFeedback} className="space-y-5">
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Rating</label>
+                <div className="flex gap-2">
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <button
+                      key={star}
+                      type="button"
+                      onClick={() => setFeedbackRating(star)}
+                      className="p-1 transition-transform hover:scale-110"
+                      aria-label={`Rate ${star} stars`}
+                    >
+                      <Star
+                        className={`h-8 w-8 ${
+                          star <= feedbackRating
+                            ? 'fill-yellow-400 text-yellow-400'
+                            : 'text-gray-300'
+                        }`}
+                      />
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <label htmlFor="service-feedback-comment" className="block text-sm font-semibold text-gray-700 mb-2">
+                  Comments (optional)
+                </label>
+                <textarea
+                  id="service-feedback-comment"
+                  value={feedbackComment}
+                  onChange={(e) => setFeedbackComment(e.target.value)}
+                  rows={4}
+                  maxLength={1000}
+                  placeholder="Tell us about your service experience..."
+                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
+                />
+              </div>
+              <button
+                type="submit"
+                disabled={submittingFeedback}
+                className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl transition-colors disabled:opacity-50"
+              >
+                {submittingFeedback ? 'Submitting...' : 'Submit Feedback'}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Cancel Order Confirmation Modal */}
+      {cancelOrderModal && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[200] flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl relative animate-scale-up">
+            <h3 className="text-xl font-bold text-gray-900 mb-2">Cancel Order</h3>
+            <p className="text-gray-600 mb-6">
+              Are you sure you want to cancel order <span className="font-semibold text-gray-900">#{cancelOrderModal.orderNumber || cancelOrderModal.id.slice(-6).toUpperCase()}</span>? This action cannot be undone.
+            </p>
+            <div className="flex gap-4">
+              <button
+                onClick={() => setCancelOrderModal(null)}
+                className="flex-1 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-xl transition-colors"
+              >
+                No, Keep Order
+              </button>
+              <button
+                onClick={async () => {
+                  const targetOrderId = cancelOrderModal.id;
+                  setCancelOrderModal(null);
+                  await updateOrderStatus(targetOrderId, 'cancelled');
+                  showToast('Order cancelled successfully.', 'success');
+                }}
+                className="flex-1 py-3 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl transition-colors"
+              >
+                Yes, Cancel Order
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Cancel Booking Confirmation Modal */}
+      {cancelBookingModal && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[200] flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl relative animate-scale-up">
+            <h3 className="text-xl font-bold text-gray-900 mb-2">Cancel Booking</h3>
+            <p className="text-gray-600 mb-6">
+              Are you sure you want to cancel booking for <span className="font-semibold text-gray-900">{cancelBookingModal.name}</span>? This action cannot be undone.
+            </p>
+            <div className="flex gap-4">
+              <button
+                onClick={() => setCancelBookingModal(null)}
+                className="flex-1 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-xl transition-colors"
+              >
+                No, Keep Booking
+              </button>
+              <button
+                onClick={async () => {
+                  const targetBookingId = cancelBookingModal.id;
+                  setCancelBookingModal(null);
+                  await updateServiceBookingStatus(targetBookingId, 'Cancelled');
+                  showToast('Booking cancelled successfully.', 'success');
+                }}
+                className="flex-1 py-3 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl transition-colors"
+              >
+                Yes, Cancel Booking
+              </button>
+            </div>
           </div>
         </div>
       )}

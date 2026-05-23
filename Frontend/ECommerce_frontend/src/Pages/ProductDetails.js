@@ -4,16 +4,27 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { Star, ShieldCheck, Truck, ShoppingCart, Heart } from 'lucide-react';
 import { useAppContext } from '../Context/AppContext';
 import { fetchProductById } from '../api.js';
+import { getProductDiscountInfo } from '../utils/discount';
 
 const ProductDetails = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { addToCart, toggleWishlist, wishlist, products, user } = useAppContext();
+  const { addToCart, toggleWishlist, wishlist, products, user, showToast } = useAppContext();
   
   const [product, setProduct] = useState(null);
   const [loading, setLoading] = useState(true);
   const [quantity, setQuantity] = useState(1);
   const [selectedSize, setSelectedSize] = useState(null);
+
+  const getDeliveryDateString = () => {
+    const date = new Date();
+    date.setDate(date.getDate() + 2);
+    return date.toLocaleDateString('en-IN', {
+      weekday: 'long',
+      day: 'numeric',
+      month: 'short',
+    });
+  };
 
   useEffect(() => {
     const loadProduct = async () => {
@@ -41,7 +52,7 @@ const ProductDetails = () => {
   const handleAddToCart = () => {
     if (!product) return;
     if (product?.sizes?.length > 0 && !selectedSize) {
-      alert("Please select a size first.");
+      showToast("Please select a size first.", "error");
       return;
     }
     addToCart(product, quantity, selectedSize);
@@ -87,7 +98,31 @@ const ProductDetails = () => {
               <span>•</span>
               <span className="text-indigo-600 font-medium">By {product.vendor}</span>
             </div>
-            <p className="text-3xl font-extrabold text-gray-900">₹{product.price.toFixed(2)}</p>
+            {(() => {
+              const { hasDiscount, discountPercent, originalPrice } = getProductDiscountInfo(product);
+              return (
+                <div className="space-y-1">
+                  <div className="flex items-center gap-3">
+                    {hasDiscount && (
+                      <span className="text-red-500 text-3xl font-medium">-{discountPercent}%</span>
+                    )}
+                    <span className="text-3xl font-extrabold text-gray-900">
+                      ₹{product.price.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </span>
+                  </div>
+                  <div className="text-sm font-semibold text-gray-500 flex items-center gap-1.5">
+                    {hasDiscount ? (
+                      <>
+                        M.R.P.: <span className="line-through font-bold">₹{originalPrice.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                      </>
+                    ) : (
+                      <span>Price</span>
+                    )}
+                    <span className="text-xs font-normal text-gray-400 ml-2">(inc. of all taxes)</span>
+                  </div>
+                </div>
+              );
+            })()}
           </div>
 
           <p className="text-gray-600 mb-8 leading-relaxed">
@@ -125,6 +160,13 @@ const ProductDetails = () => {
             </div>
           </div>
 
+          <div className="mb-6 bg-slate-50 border border-slate-100 rounded-2xl p-4 flex items-center gap-3">
+            <Truck className="h-5 w-5 text-indigo-600 shrink-0" />
+            <div className="text-sm font-medium text-slate-700">
+              Delivery by <span className="font-extrabold text-slate-900">{getDeliveryDateString()}</span>
+            </div>
+          </div>
+
           <div className="flex flex-col sm:flex-row gap-4 mt-auto">
             {!user?.isVendor && (
               <button 
@@ -144,10 +186,7 @@ const ProductDetails = () => {
             )}
           </div>
 
-          <div className="grid grid-cols-2 gap-4 mt-8 pt-8 border-t border-gray-100 text-sm text-gray-600">
-            <div className="flex items-center gap-2">
-              <Truck className="h-5 w-5 text-gray-400" /> Free Delivery
-            </div>
+          <div className="grid grid-cols-1 gap-4 mt-8 pt-8 border-t border-gray-100 text-sm text-gray-600">
             <div className="flex items-center gap-2">
               <ShieldCheck className="h-5 w-5 text-gray-400" /> 30-Day Returns
             </div>

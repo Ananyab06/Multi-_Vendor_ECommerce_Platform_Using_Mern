@@ -1,5 +1,6 @@
 import React, { createContext, useState, useContext, useEffect, useCallback } from 'react';
 import * as api from '../api';
+import { connectSocket } from '../socket';
 
 const AppContext = createContext();
 
@@ -13,6 +14,12 @@ export const AppProvider = ({ children }) => {
   const [products, setProducts] = useState([]);
   const [services, setServices] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [socket, setSocket] = useState(null);
+  const [toast, setToast] = useState(null);
+
+  const showToast = useCallback((message, type = 'success') => {
+    setToast({ message, type });
+  }, []);
 
   // Restore login session from token after page refresh
   useEffect(() => {
@@ -106,6 +113,7 @@ export const AppProvider = ({ children }) => {
       id: product._id?.toString() || product.id,
       name: product.name,
       price: product.price,
+      originalPrice: product.originalPrice,
       image: product.image,
       category: product.category,
       vendor: product.vendorId?.storeName || product.vendor || 'Unknown Vendor',
@@ -147,6 +155,7 @@ export const AppProvider = ({ children }) => {
             // Transform backend orders to match frontend structure
             const transformedOrders = ordersRes.data.map(order => ({
               id: order._id,
+              orderNumber: order.orderNumber,
               date: new Date(order.createdAt).toISOString().split('T')[0],
               items: order.items.map(item => ({
                 id: item.productId?._id || item.productId || item._id,
@@ -195,6 +204,102 @@ export const AppProvider = ({ children }) => {
     }
   }, [user, authLoading]);
 
+  // WebSocket: unified connection management
+  useEffect(() => {
+    if (!user) {
+      setSocket(null);
+      return;
+    }
+
+    const token = localStorage.getItem('token');
+    if (!token) return;
+
+    const s = connectSocket(token);
+    setSocket(s);
+
+    s.on('connect_error', (err) => {
+      console.error('WebSocket connection error:', err.message);
+    });
+
+    return () => {
+      s.disconnect();
+    };
+  }, [user]);
+
+  // WebSocket: listeners for order, booking status, and catalog changes
+  useEffect(() => {
+    if (!socket || !user) return;
+
+    // Customer specific updates
+    if (!user.isVendor) {
+      socket.on('order_status_updated', (data) => {
+        setOrders((prev) =>
+          prev.map((order) =>
+            order.id === data.orderId ? { ...order, status: data.status } : order
+          )
+        );
+      });
+
+      socket.on('booking_status_updated', (data) => {
+        setServiceBookings((prev) =>
+          prev.map((booking) =>
+            booking.id === data.bookingId
+              ? { ...booking, status: data.status, technician: data.technician }
+              : booking
+          )
+        );
+      });
+    }
+
+    // Catalog real-time sync for everyone who is logged in
+    socket.on('product_added', (product) => {
+      setProducts((prev) => {
+        if (prev.some((p) => p.id === product.id)) return prev;
+        return [...prev, product];
+      });
+    });
+
+    socket.on('product_updated', (product) => {
+      setProducts((prev) =>
+        prev.map((p) => (p.id === product.id ? product : p))
+      );
+    });
+
+    socket.on('product_deleted', (data) => {
+      setProducts((prev) => prev.filter((p) => p.id !== data.productId));
+      setCart((prev) => prev.filter((item) => item.id !== data.productId));
+      setWishlist((prev) => prev.filter((item) => item.id !== data.productId));
+    });
+
+    socket.on('service_added', (service) => {
+      setServices((prev) => {
+        if (prev.some((s) => s.id === service.id)) return prev;
+        return [...prev, service];
+      });
+    });
+
+    socket.on('service_updated', (service) => {
+      setServices((prev) =>
+        prev.map((s) => (s.id === service.id ? service : s))
+      );
+    });
+
+    socket.on('service_deleted', (data) => {
+      setServices((prev) => prev.filter((s) => s.id !== data.serviceId));
+    });
+
+    return () => {
+      socket.off('order_status_updated');
+      socket.off('booking_status_updated');
+      socket.off('product_added');
+      socket.off('product_updated');
+      socket.off('product_deleted');
+      socket.off('service_added');
+      socket.off('service_updated');
+      socket.off('service_deleted');
+    };
+  }, [socket, user]);
+
   const addProduct = async (newProduct) => {
     try {
       // Ensure product has vendorId if user is a vendor
@@ -214,7 +319,7 @@ export const AppProvider = ({ children }) => {
       return createdProduct;
     } catch (err) {
       console.error('Failed to add product', err);
-      alert('Failed to add product');
+      showToast('Failed to add product', 'error');
       throw err;
     }
   };
@@ -235,7 +340,7 @@ export const AppProvider = ({ children }) => {
       return updated;
     } catch (err) {
       console.error('Failed to update product', err);
-      alert('Failed to update product');
+      showToast('Failed to update product', 'error');
       throw err;
     }
   };
@@ -248,7 +353,7 @@ export const AppProvider = ({ children }) => {
       setWishlist(prev => prev.filter(item => item.id !== id));
     } catch (err) {
       console.error('Failed to delete product', err);
-      alert('Failed to delete product');
+      showToast('Failed to delete product', 'error');
       throw err;
     }
   };
@@ -267,7 +372,7 @@ export const AppProvider = ({ children }) => {
       return created;
     } catch (err) {
       console.error('Failed to add service', err);
-      alert(err.response?.data?.message || 'Failed to add service');
+      showToast(err.response?.data?.message || 'Failed to add service', 'error');
       throw err;
     }
   };
@@ -287,7 +392,7 @@ export const AppProvider = ({ children }) => {
       return updated;
     } catch (err) {
       console.error('Failed to update service', err);
-      alert(err.response?.data?.message || 'Failed to update service');
+      showToast(err.response?.data?.message || 'Failed to update service', 'error');
       throw err;
     }
   };
@@ -298,7 +403,7 @@ export const AppProvider = ({ children }) => {
       setServices((prev) => prev.filter((s) => s.id !== id));
     } catch (err) {
       console.error('Failed to delete service', err);
-      alert(err.response?.data?.message || 'Failed to delete service');
+      showToast(err.response?.data?.message || 'Failed to delete service', 'error');
       throw err;
     }
   };
@@ -325,7 +430,7 @@ export const AppProvider = ({ children }) => {
 
   const addServiceBooking = async (booking) => {
     if (!user || user.isVendor) {
-      alert('Please login as a customer to book a service.');
+      showToast('Please login as a customer to book a service.', 'error');
       return { success: false };
     }
 
@@ -337,7 +442,7 @@ export const AppProvider = ({ children }) => {
     } catch (err) {
       console.error('Failed to book service', err);
       const message = err.response?.data?.message || 'Failed to book service';
-      alert(message);
+      showToast(message, 'error');
       return { success: false, error: message };
     }
   };
@@ -351,7 +456,7 @@ export const AppProvider = ({ children }) => {
       );
     } catch (err) {
       console.error('Failed to update booking status', err);
-      alert(err.response?.data?.message || 'Failed to update booking');
+      showToast(err.response?.data?.message || 'Failed to update booking', 'error');
     }
   };
 
@@ -396,6 +501,45 @@ export const AppProvider = ({ children }) => {
         success: false,
         error: err.response?.data?.message || 'Failed to submit feedback',
       };
+    }
+  };
+
+  const submitServiceBookingFeedback = async (bookingId, { rating, comment }) => {
+    try {
+      const response = await api.submitServiceBookingFeedback(bookingId, { rating, comment });
+      const feedback = response.data.feedback;
+      setServiceBookings((prev) =>
+        prev.map((booking) =>
+          booking.id === bookingId
+            ? {
+                ...booking,
+                feedback: {
+                  rating: feedback.rating,
+                  comment: feedback.comment || '',
+                  createdAt: feedback.createdAt,
+                },
+              }
+            : booking
+        )
+      );
+      return { success: true };
+    } catch (err) {
+      console.error('Failed to submit booking feedback', err);
+      return {
+        success: false,
+        error: err.response?.data?.message || 'Failed to submit feedback',
+      };
+    }
+  };  const updateOrderStatus = async (orderId, newStatus) => {
+    try {
+      await api.updateOrderStatus(orderId, newStatus);
+      setOrders((prev) =>
+        prev.map((o) => (o.id === orderId ? { ...o, status: newStatus } : o))
+      );
+      showToast('Order status updated successfully', 'success');
+    } catch (err) {
+      console.error('Failed to update order status', err);
+      showToast(err.response?.data?.message || 'Failed to update order status', 'error');
     }
   };
 
@@ -503,7 +647,7 @@ export const AppProvider = ({ children }) => {
     console.log("the product that i am gettting ", size);
 
     if (!user) {
-      alert("Please login first to add items to your cart.");
+      showToast("Please login first to add items to your cart.", 'error');
       return;
     }
 
@@ -513,14 +657,12 @@ export const AppProvider = ({ children }) => {
     const requestedTotal = currentQtyInCart + quantity;
 
     if (availableStock <= 0) {
-      alert(`Sorry, ${product.name} is out of stock.`);
+      showToast(`Sorry, ${product.name} is out of stock.`, 'error');
       return;
     }
 
     if (requestedTotal > availableStock) {
-      alert(
-        `Insufficient stock for ${product.name}. Available: ${availableStock}, Requested: ${requestedTotal}`
-      );
+      showToast(`Insufficient stock for ${product.name}. Available: ${availableStock}, Requested: ${requestedTotal}`, 'error');
       return;
     }
 
@@ -531,14 +673,13 @@ export const AppProvider = ({ children }) => {
         setCart(prevCart => prevCart.map((item) =>
           item.id === product.id && item.size === size ? { ...item, quantity: item.quantity + quantity } : item
         ));
-        alert(`${product.name} quantity updated in cart!`);
       } else {
         setCart(prevCart => [...prevCart, { ...product, quantity, size }]);
-        alert(`${product.name} added to cart!`);
       }
+      showToast(`Added ${product.name} to cart.`, 'success');
     } catch (err) {
       console.error('Failed to add to cart', err);
-      alert(err.response?.data?.message || 'Failed to add item to cart');
+      showToast(err.response?.data?.message || 'Failed to add item to cart', 'error');
     }
   };
 
@@ -562,13 +703,13 @@ export const AppProvider = ({ children }) => {
       );
     } catch (err) {
       console.error('Failed to update cart quantity', err);
-      alert('Failed to update quantity');
+      showToast('Failed to update quantity', 'error');
     }
   };
 
   const toggleWishlist = async (product) => {
     if (!user) {
-      alert("Please login first to add items to your wishlist.");
+      showToast("Please login first to add items to your wishlist.", 'error');
       return;
     }
 
@@ -577,31 +718,29 @@ export const AppProvider = ({ children }) => {
       if (exists) {
         await api.removeFromWishlist(product._id || product.id);
         setWishlist(prevWishlist => prevWishlist.filter((item) => item.id !== product.id));
-        alert(`${product.name} removed from wishlist!`);
       } else {
         await api.addToWishlist(product._id || product.id);
         setWishlist(prevWishlist => [...prevWishlist, product]);
-        alert(`${product.name} added to wishlist!`);
+        showToast(`Added ${product.name} to wishlist.`, 'success');
       }
     } catch (err) {
       console.error('Failed to toggle wishlist', err);
-      alert('Failed to update wishlist');
+      showToast('Failed to update wishlist', 'error');
     }
   };
 
   const removeFromWishlist = async (productId) => {
     if (!user) {
-      alert("Please login first to remove items from your wishlist.");
+      showToast("Please login first to remove items from your wishlist.", 'error');
       return;
     }
 
     try {
       await api.removeFromWishlist(productId);
       setWishlist((prevWishlist) => prevWishlist.filter((item) => item.id !== productId));
-      alert("Item removed from wishlist!");
     } catch (err) {
       console.error('Failed to remove from wishlist', err);
-      alert('Failed to remove item from wishlist');
+      showToast('Failed to remove item from wishlist', 'error');
     }
   };
 
@@ -609,15 +748,69 @@ export const AppProvider = ({ children }) => {
     <AppContext.Provider value={{ 
       cart, setCart, addToCart, removeFromCart, updateCartQuantity, updateCartItemSize, 
       wishlist, setWishlist, toggleWishlist, removeFromWishlist, 
-      user, setUser, login, logout, authLoading,
-      serviceBookings, addServiceBooking, updateServiceBookingStatus, refreshServiceBookings,
-      orders, addOrder, submitOrderFeedback,
+      user, setUser, login, logout, authLoading, socket,
+      serviceBookings, addServiceBooking, updateServiceBookingStatus, refreshServiceBookings, submitServiceBookingFeedback,
+      orders, addOrder, submitOrderFeedback, updateOrderStatus,
       products, addProduct, updateProduct, deleteProduct,
       services, addService, updateService, deleteService,
-      loading
+      loading, showToast
     }}>
       {children}
+      <Toast toast={toast} onClose={() => setToast(null)} />
     </AppContext.Provider>
+  );
+};
+
+const Toast = ({ toast, onClose }) => {
+  useEffect(() => {
+    if (!toast) return;
+    const timer = setTimeout(() => {
+      onClose();
+    }, 4000);
+    return () => clearTimeout(timer);
+  }, [toast, onClose]);
+
+  if (!toast) return null;
+
+  const { message, type } = toast;
+
+  const bgColor = type === 'error' ? 'bg-rose-50 border-rose-100 text-rose-800' : 
+                  type === 'info' ? 'bg-blue-50 border-blue-100 text-blue-800' : 
+                  'bg-emerald-50 border-emerald-100 text-emerald-800';
+
+  const iconColor = type === 'error' ? 'text-rose-500' :
+                    type === 'info' ? 'text-blue-500' :
+                    'text-emerald-500';
+
+  const iconSvg = type === 'error' ? (
+    <svg className={`h-5 w-5 ${iconColor} shrink-0`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+    </svg>
+  ) : type === 'info' ? (
+    <svg className={`h-5 w-5 ${iconColor} shrink-0`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+    </svg>
+  ) : (
+    <svg className={`h-5 w-5 ${iconColor} shrink-0`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+    </svg>
+  );
+
+  return (
+    <div className="fixed top-24 right-6 z-[9999] animate-toast-in pointer-events-none">
+      <div className={`flex items-center gap-3 px-5 py-4 rounded-2xl shadow-xl border ${bgColor} max-w-sm pointer-events-auto`}>
+        {iconSvg}
+        <span className="text-sm font-bold tracking-tight">{message}</span>
+        <button 
+          onClick={onClose}
+          className="ml-auto p-1 rounded-lg hover:bg-black/5 text-gray-400 hover:text-gray-600 transition-colors"
+        >
+          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+    </div>
   );
 };
 

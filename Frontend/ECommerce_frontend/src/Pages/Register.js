@@ -38,7 +38,9 @@ const Register = () => {
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
   const [companyName, setCompanyName] = useState('');
+  const [gstNumber, setGstNumber] = useState('');
   const [loading, setLoading] = useState(false);
+  const [errors, setErrors] = useState({});
   const navigate = useNavigate();
   const { login } = useAppContext();
 
@@ -48,6 +50,7 @@ const Register = () => {
     } else {
       setSearchParams({});
     }
+    setErrors({});
   };
 
   useEffect(() => {
@@ -56,24 +59,162 @@ const Register = () => {
     setIdentifier('');
     setPassword('');
     setCompanyName('');
+    setGstNumber('');
+    setErrors({});
   }, [accountType]);
+
+  const handleNameChange = (e) => {
+    const val = e.target.value.replace(/[^A-Za-z\s]/g, '');
+    setName(val);
+    if (errors.name) {
+      setErrors((prev) => {
+        const next = { ...prev };
+        delete next.name;
+        return next;
+      });
+    }
+  };
+
+  const handleCompanyNameChange = (e) => {
+    const val = e.target.value;
+    setCompanyName(val);
+    if (errors.companyName) {
+      setErrors((prev) => {
+        const next = { ...prev };
+        delete next.companyName;
+        return next;
+      });
+    }
+  };
+
+  const handleEmailChange = (e) => {
+    const val = e.target.value;
+    setEmail(val);
+    if (errors.email) {
+      setErrors((prev) => {
+        const next = { ...prev };
+        delete next.email;
+        return next;
+      });
+    }
+  };
+
+  const handleIdentifierChange = (e) => {
+    const val = e.target.value;
+    setIdentifier(val);
+    if (errors.identifier) {
+      setErrors((prev) => {
+        const next = { ...prev };
+        delete next.identifier;
+        return next;
+      });
+    }
+  };
+
+  const handlePasswordChange = (e) => {
+    const val = e.target.value;
+    setPassword(val);
+    if (errors.password || errors.form) {
+      setErrors((prev) => {
+        const next = { ...prev };
+        delete next.password;
+        delete next.form;
+        return next;
+      });
+    }
+  };
+
+  const handleNameBlur = () => {
+    if (!name.trim()) {
+      setErrors((prev) => ({ ...prev, name: 'Full Name is required.' }));
+    } else if (!/^[A-Za-z\s]+$/.test(name.trim())) {
+      setErrors((prev) => ({ ...prev, name: 'Name should only contain alphabets.' }));
+    }
+  };
+
+  const handleCompanyNameBlur = () => {
+    if (isVendor && !companyName.trim()) {
+      setErrors((prev) => ({ ...prev, companyName: 'Company Name is required.' }));
+    }
+  };
+
+  const handleEmailBlur = () => {
+    const trimmedEmail = email.trim();
+    if (!trimmedEmail) {
+      setErrors((prev) => ({ ...prev, email: 'Email address is required.' }));
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
+      setErrors((prev) => ({ ...prev, email: 'Please enter a valid email address.' }));
+    }
+  };
+
+  const handleIdentifierBlur = () => {
+    const trimmedId = identifier.trim();
+    if (isVendor && !trimmedId) {
+      setErrors((prev) => ({ ...prev, identifier: 'Mobile number is required.' }));
+    } else if (trimmedId && !/^[0-9]{10}$/.test(trimmedId)) {
+      setErrors((prev) => ({ ...prev, identifier: 'Please enter a valid 10-digit mobile number.' }));
+    }
+  };
+
+  const handlePasswordBlur = () => {
+    if (!password) {
+      setErrors((prev) => ({ ...prev, password: 'Password is required.' }));
+    } else if (password.length < 6) {
+      setErrors((prev) => ({ ...prev, password: 'Password must be at least 6 characters long.' }));
+    }
+  };
 
   const handleRegister = async (e) => {
     e.preventDefault();
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
-      alert('Please enter a valid email address.');
+    const newErrors = {};
+
+    if (!name.trim()) {
+      newErrors.name = 'Full Name is required.';
+    } else if (!/^[A-Za-z\s]+$/.test(name.trim())) {
+      newErrors.name = 'Name should only contain alphabets.';
+    }
+
+    if (isVendor && !companyName.trim()) {
+      newErrors.companyName = 'Company Name is required.';
+    }
+
+    const trimmedEmail = email.trim();
+    if (!trimmedEmail) {
+      newErrors.email = 'Email address is required.';
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
+      newErrors.email = 'Please enter a valid email address.';
+    }
+
+    const trimmedId = identifier.trim();
+    if (isVendor && !trimmedId) {
+      newErrors.identifier = 'Mobile number is required.';
+    } else if (trimmedId && !/^[0-9]{10}$/.test(trimmedId)) {
+      newErrors.identifier = 'Please enter a valid 10-digit mobile number.';
+    }
+
+    if (!password) {
+      newErrors.password = 'Password is required.';
+    } else if (password.length < 6) {
+      newErrors.password = 'Password must be at least 6 characters long.';
+    }
+
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
       return;
     }
+
     setLoading(true);
+    setErrors({});
 
     try {
       if (accountType === 'vendor') {
         const vendorData = {
           name: name.trim(),
-          email: email.trim(),
+          email: trimmedEmail,
           password,
           storeName: companyName.trim(),
-          mobile: identifier,
+          mobile: trimmedId,
+          gstNumber: gstNumber.trim() || 'NA',
         };
         const response = await registerVendor(vendorData);
         const { token, vendor } = response.data;
@@ -81,11 +222,11 @@ const Register = () => {
         navigate('/vendor');
       } else {
         const userData = {
-          name: name || 'User',
-          email: email.trim(),
+          name: name.trim() || 'User',
+          email: trimmedEmail,
           password,
           role: 'user',
-          ...(identifier.trim() ? { mobile: identifier.trim() } : {}),
+          ...(trimmedId ? { mobile: trimmedId } : {}),
         };
         const response = await registerUser(userData);
         const { token, user } = response.data;
@@ -93,8 +234,24 @@ const Register = () => {
         navigate('/');
       }
     } catch (err) {
+      console.error('Registration failed', err);
       const errorMsg = err.response?.data?.message || 'Registration failed';
-      alert(`Registration failed: ${errorMsg}`);
+      const lowerMsg = errorMsg.toLowerCase();
+      if (lowerMsg.includes('email') || lowerMsg.includes('already exists') || lowerMsg.includes('registered')) {
+        if (lowerMsg.includes('mobile') || lowerMsg.includes('phone')) {
+          setErrors((prev) => ({ ...prev, identifier: errorMsg }));
+        } else {
+          setErrors((prev) => ({ ...prev, email: errorMsg }));
+        }
+      } else if (lowerMsg.includes('company') || lowerMsg.includes('store')) {
+        setErrors((prev) => ({ ...prev, companyName: errorMsg }));
+      } else if (lowerMsg.includes('name')) {
+        setErrors((prev) => ({ ...prev, name: errorMsg }));
+      } else if (lowerMsg.includes('password')) {
+        setErrors((prev) => ({ ...prev, password: errorMsg }));
+      } else {
+        setErrors((prev) => ({ ...prev, form: errorMsg }));
+      }
     } finally {
       setLoading(false);
     }
@@ -119,14 +276,16 @@ const Register = () => {
           <input
             type="text"
             required
-            pattern="[A-Za-z\s]+"
-            title="Name should only contain alphabets"
             className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors"
             placeholder="John Doe"
             value={name}
-            onChange={(e) => setName(e.target.value.replace(/[^A-Za-z\s]/g, ''))}
+            onChange={handleNameChange}
+            onBlur={handleNameBlur}
             autoComplete="off"
           />
+          {errors.name && (
+            <p className="mt-1 text-sm text-red-500 font-medium">{errors.name}</p>
+          )}
         </div>
 
         {isVendor && (
@@ -138,9 +297,13 @@ const Register = () => {
               className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors"
               placeholder="Tech Haven LLC"
               value={companyName}
-              onChange={(e) => setCompanyName(e.target.value)}
+              onChange={handleCompanyNameChange}
+              onBlur={handleCompanyNameBlur}
               autoComplete="off"
             />
+            {errors.companyName && (
+              <p className="mt-1 text-sm text-red-500 font-medium">{errors.companyName}</p>
+            )}
           </div>
         )}
 
@@ -154,9 +317,13 @@ const Register = () => {
             className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors"
             placeholder={isVendor ? 'vendor@example.com' : 'john@example.com'}
             value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            onChange={handleEmailChange}
+            onBlur={handleEmailBlur}
             autoComplete="off"
           />
+          {errors.email && (
+            <p className="mt-1 text-sm text-red-500 font-medium">{errors.email}</p>
+          )}
         </div>
 
         <div>
@@ -166,15 +333,33 @@ const Register = () => {
           <input
             type="tel"
             required={isVendor}
-            pattern="[0-9]{10}"
-            title="Please enter a valid 10-digit mobile number"
             className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors"
             placeholder="Enter 10-digit mobile number"
             value={identifier}
-            onChange={(e) => setIdentifier(e.target.value)}
+            onChange={handleIdentifierChange}
+            onBlur={handleIdentifierBlur}
             autoComplete="off"
           />
+          {errors.identifier && (
+            <p className="mt-1 text-sm text-red-500 font-medium">{errors.identifier}</p>
+          )}
         </div>
+
+        {isVendor && (
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              GST Number (Optional, default is NA)
+            </label>
+            <input
+              type="text"
+              className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors uppercase"
+              placeholder="e.g. 06AAZHR8370R1ZQ or NA"
+              value={gstNumber}
+              onChange={(e) => setGstNumber(e.target.value)}
+              autoComplete="off"
+            />
+          </div>
+        )}
 
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">Password</label>
@@ -184,10 +369,20 @@ const Register = () => {
             className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors"
             placeholder="Create a password"
             value={password}
-            onChange={(e) => setPassword(e.target.value)}
+            onChange={handlePasswordChange}
+            onBlur={handlePasswordBlur}
             autoComplete="new-password"
           />
+          {errors.password && (
+            <p className="mt-1 text-sm text-red-500 font-medium">{errors.password}</p>
+          )}
         </div>
+
+        {errors.form && (
+          <div className="p-3 bg-red-50 text-red-700 text-sm font-medium rounded-lg border border-red-200">
+            {errors.form}
+          </div>
+        )}
 
         <button
           type="submit"

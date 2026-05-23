@@ -10,6 +10,7 @@ const transformProduct = (productDoc) => {
     id: productDoc._id.toString(), // keep as string for now
     name: productDoc.name,
     price: productDoc.price,
+    originalPrice: productDoc.originalPrice,
     rating: productDoc.rating,
     reviews: productDoc.reviews,
     vendor,
@@ -50,13 +51,14 @@ exports.getProductById = async (req, res) => {
 // Create product (vendor only)
 exports.createProduct = async (req, res) => {
   try {
-    const { name, description, price, image, category, rating, reviews, stock, sizes } = req.body;
+    const { name, description, price, originalPrice, image, category, rating, reviews, stock, sizes } = req.body;
     const vendorId = req.vendor.id;
 
     const product = new Product({
       name,
       description,
       price,
+      originalPrice,
       image,
       category,
       vendorId,
@@ -68,7 +70,12 @@ exports.createProduct = async (req, res) => {
 
     await product.save();
     const populated = await Product.findById(product._id).populate('vendorId', 'name storeName');
-    res.status(201).json({ message: 'Product created', product: transformProduct(populated) });
+    const transformed = transformProduct(populated);
+    
+    const { broadcastProductAdded } = require('../socket');
+    broadcastProductAdded(transformed);
+
+    res.status(201).json({ message: 'Product created', product: transformed });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Server error' });
@@ -78,7 +85,7 @@ exports.createProduct = async (req, res) => {
 // Update product (vendor only)
 exports.updateProduct = async (req, res) => {
   try {
-    const { name, description, price, image, category, rating, reviews, stock, sizes } = req.body;
+    const { name, description, price, originalPrice, image, category, rating, reviews, stock, sizes } = req.body;
     const product = await Product.findById(req.params.id);
 
     if (!product) {
@@ -93,6 +100,7 @@ exports.updateProduct = async (req, res) => {
     if (name !== undefined) product.name = name;
     if (description !== undefined) product.description = description;
     if (price !== undefined) product.price = price;
+    if (originalPrice !== undefined) product.originalPrice = originalPrice;
     if (image !== undefined) product.image = image;
     if (category !== undefined) product.category = category;
     if (rating !== undefined) product.rating = rating;
@@ -102,7 +110,12 @@ exports.updateProduct = async (req, res) => {
 
     await product.save();
     const populated = await Product.findById(product._id).populate('vendorId', 'name storeName');
-    res.json({ message: 'Product updated', product: transformProduct(populated) });
+    const transformed = transformProduct(populated);
+
+    const { broadcastProductUpdated } = require('../socket');
+    broadcastProductUpdated(transformed);
+
+    res.json({ message: 'Product updated', product: transformed });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Server error' });
@@ -123,7 +136,12 @@ exports.deleteProduct = async (req, res) => {
       return res.status(403).json({ message: 'Not authorized' });
     }
 
+    const productId = product._id.toString();
     await product.deleteOne();
+
+    const { broadcastProductDeleted } = require('../socket');
+    broadcastProductDeleted(productId);
+
     res.json({ message: 'Product deleted' });
   } catch (err) {
     console.error(err);
