@@ -158,7 +158,7 @@ const Navbar = () => {
           <Link to="/category/Sports" className="hover:text-gray-300 transition-colors">Sports</Link>
           <Link to="/category/Toys" className="hover:text-gray-300 transition-colors">Toys</Link>
           <Link to="/category/Groceries" className="hover:text-gray-300 transition-colors">Groceries</Link>
-          <Link to="/category/Automotive" className="hover:text-gray-300 transition-colors">Automotive</Link>
+          <Link to="/category/Automotive" className="hover:text-gray-300 transition-colors">Automotive</Link>          {!user?.isVendor && <Link to="/services" className="hover:text-gray-300 transition-colors font-medium">Services</Link>}
         </div>
       </div>
 
