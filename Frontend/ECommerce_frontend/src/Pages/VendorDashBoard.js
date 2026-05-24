@@ -268,7 +268,7 @@ const VendorDashboard = () => {
   const [imagePreview, setImagePreview] = useState('');
   const imageInputRef = useRef(null);
   const [activeToast, setActiveToast] = useState(null);
-  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth()); // 0-11
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [cancelOrderModal, setCancelOrderModal] = useState(null);
   const [deleteItemModal, setDeleteItemModal] = useState(null);
 
@@ -433,34 +433,50 @@ const VendorDashboard = () => {
     // Mock visitors based on products and orders (starts at 0 for new vendors)
     const visitors = (vendorProducts.length * 5) + (vendorProductOrders.length * 12);
 
-    // Dynamic chart data: group revenue by date for the selected month
-    const currentYear = new Date().getFullYear();
-    const daysInMonth = new Date(currentYear, selectedMonth + 1, 0).getDate();
-    const chartData = Array.from({ length: daysInMonth }, (_, i) => {
-      const day = i + 1;
-      const dateStr = `${currentYear}-${String(selectedMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    // Dynamic chart data: group revenue by month for the selected year
+    const chartData = Array.from({ length: 12 }, (_, i) => {
+      const monthIndex = i; // 0 to 11
+      const monthLabel = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'][monthIndex];
+      const monthShort = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][monthIndex];
       
-      // Get product revenue for this day
-      const dailyProductRevenue = vendorProductOrders
-        .filter((order) => order.date === dateStr && order.status !== 'cancelled' && order.status !== 'Cancelled')
+      // Get product revenue for this month
+      const monthlyProductRevenue = vendorProductOrders
+        .filter((order) => {
+          if (order.status === 'cancelled' || order.status === 'Cancelled') return false;
+          if (!order.date) return false;
+          const parts = order.date.split('-');
+          if (parts.length < 2) return false;
+          const yr = parseInt(parts[0], 10);
+          const mo = parseInt(parts[1], 10);
+          return yr === selectedYear && (mo - 1) === monthIndex;
+        })
         .reduce((sum, order) => sum + (Number(order.total) || 0), 0);
 
-      // Get service revenue for this day
-      const dailyServiceRevenue = vendorBookings
-        .filter(booking => booking.date === dateStr && booking.status !== 'cancelled' && booking.status !== 'Cancelled')
+      // Get service revenue for this month
+      const monthlyServiceRevenue = vendorBookings
+        .filter((booking) => {
+          if (booking.status === 'cancelled' || booking.status === 'Cancelled') return false;
+          if (!booking.date) return false;
+          const parts = booking.date.split('-');
+          if (parts.length < 2) return false;
+          const yr = parseInt(parts[0], 10);
+          const mo = parseInt(parts[1], 10);
+          return yr === selectedYear && (mo - 1) === monthIndex;
+        })
         .reduce((sum, booking) => sum + (Number(booking.price) || 0), 0);
 
-      const totalDailyRevenue = dailyProductRevenue + dailyServiceRevenue;
+      const totalMonthlyRevenue = monthlyProductRevenue + monthlyServiceRevenue;
 
       return { 
-        day, 
-        revenue: totalDailyRevenue,
-        productRev: dailyProductRevenue,
-        serviceRev: dailyServiceRevenue
+        month: monthLabel, 
+        monthShort,
+        revenue: totalMonthlyRevenue,
+        productRev: monthlyProductRevenue,
+        serviceRev: monthlyServiceRevenue
       };
     });
 
-    const maxDailyRevenue = Math.max(...chartData.map(d => d.revenue), 100);
+    const maxMonthlyRevenue = Math.max(...chartData.map(d => d.revenue), 100);
 
     return {
       revenue: `₹${revenue.toLocaleString('en-IN')}`,
@@ -473,9 +489,9 @@ const VendorDashboard = () => {
       vendorOrders: vendorProductOrders,
       vendorBookings: vendorBookings,
       chartData,
-      maxDailyRevenue
+      maxDailyRevenue: maxMonthlyRevenue
     };
-  }, [vendorOrders, vendorStats, products, profile.storeName, selectedMonth, serviceBookings]);
+  }, [vendorOrders, vendorStats, products, profile.storeName, selectedYear, serviceBookings]);
 
   const handleLogout = () => {
     logout();
@@ -1188,15 +1204,15 @@ const VendorDashboard = () => {
 
               <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
                 <div className="bg-white p-8 rounded-3xl shadow-sm border border-slate-100">
-                  <div className="flex justify-between items-center mb-8">
-                    <h3 className="text-xl font-black text-slate-900">Daily Revenue Analysis</h3>
+                  <div className="flex justify-between items-center mb-12 relative z-20">
+                    <h3 className="text-xl font-black text-slate-900">Revenue Analysis</h3>
                     <select 
-                      value={selectedMonth}
-                      onChange={(e) => setSelectedMonth(parseInt(e.target.value))}
+                      value={selectedYear}
+                      onChange={(e) => setSelectedYear(parseInt(e.target.value))}
                       className="bg-slate-50 border-none rounded-lg text-xs font-bold px-3 py-2 text-slate-500 focus:ring-0"
                     >
-                      {['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'].map((m, i) => (
-                        <option key={m} value={i}>{m}</option>
+                      {[2024, 2025, 2026, 2027].map((yr) => (
+                        <option key={yr} value={yr}>{yr}</option>
                       ))}
                     </select>
                   </div>
@@ -1209,8 +1225,8 @@ const VendorDashboard = () => {
                             className={`absolute bottom-0 w-full rounded-t-lg transition-all duration-700 ${data.revenue > 0 ? 'bg-indigo-500 group-hover:bg-indigo-600 shadow-md' : 'bg-slate-200 opacity-20'}`} 
                             style={{ height: `${scaledHeight}%`, transitionDelay: `${i * 20}ms` }}
                           ></div>
-                          <div className="absolute -top-16 left-1/2 -translate-x-1/2 bg-slate-900 text-white text-[10px] font-bold px-3 py-2 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity z-10 whitespace-nowrap shadow-2xl border border-slate-700">
-                            <p className="text-indigo-400 mb-1">{data.day} {['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][selectedMonth]}</p>
+                          <div className="absolute -top-16 left-1/2 -translate-x-1/2 bg-slate-900 text-white text-[10px] font-bold px-3 py-2 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity z-10 pointer-events-none whitespace-nowrap shadow-2xl border border-slate-700">
+                            <p className="text-indigo-400 mb-1">{data.month} {selectedYear}</p>
                             <p>Products: ₹{data.productRev.toLocaleString('en-IN')}</p>
                             <p>Services: ₹{data.serviceRev.toLocaleString('en-IN')}</p>
                             <div className="mt-1 pt-1 border-t border-slate-700 text-emerald-400">Total: ₹{data.revenue.toLocaleString('en-IN')}</div>
@@ -1220,9 +1236,9 @@ const VendorDashboard = () => {
                     })}
                   </div>
                   <div className="flex justify-between mt-6 px-1 text-[8px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                    <span>Day 1</span>
-                    <span>Day {Math.floor(stats.chartData.length / 2)}</span>
-                    <span>Day {stats.chartData.length}</span>
+                    {['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'].map((m) => (
+                      <span key={m}>{m}</span>
+                    ))}
                   </div>
                 </div>
 
