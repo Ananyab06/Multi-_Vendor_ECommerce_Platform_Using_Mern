@@ -148,7 +148,13 @@ export const AppProvider = ({ children }) => {
           }
 
           if (wishlistRes.data && wishlistRes.data.products) {
-            setWishlist(wishlistRes.data.products);
+            const transformedWishlist = wishlistRes.data.products
+              .filter(Boolean)
+              .map(p => ({
+                ...p,
+                id: p._id?.toString() || p.id
+              }));
+            setWishlist(transformedWishlist);
           }
 
           if (ordersRes.data) {
@@ -304,8 +310,8 @@ export const AppProvider = ({ children }) => {
     try {
       // Ensure product has vendorId if user is a vendor
       const productData = { ...newProduct };
-      if (user && user.isVendor && user._id) {
-        productData.vendorId = user._id;
+      if (user && user.isVendor) {
+        productData.vendorId = user.id || user._id;
       }
       // Remove id field as backend will generate _id
       delete productData.id;
@@ -315,7 +321,10 @@ export const AppProvider = ({ children }) => {
       if (!createdProduct) {
         throw new Error('Invalid response from server');
       }
-      setProducts(prev => [...prev, createdProduct]);
+      setProducts(prev => {
+        if (prev.some(p => p.id === createdProduct.id)) return prev;
+        return [...prev, createdProduct];
+      });
       return createdProduct;
     } catch (err) {
       console.error('Failed to add product', err);
@@ -368,7 +377,10 @@ export const AppProvider = ({ children }) => {
 
       const response = await api.createService(serviceData);
       const created = response.data.service;
-      setServices((prev) => [...prev, created]);
+      setServices((prev) => {
+        if (prev.some(s => s.id === created.id)) return prev;
+        return [...prev, created];
+      });
       return created;
     } catch (err) {
       console.error('Failed to add service', err);
