@@ -122,7 +122,14 @@ const Services = () => {
         ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
           {services.map((service) => {
-            const isBooked = serviceBookings.find((b) => b.name === service.name);
+            const isBooked = serviceBookings.find(
+              (b) =>
+                b.name === service.name &&
+                b.status !== 'Cancelled' &&
+                b.status !== 'cancelled' &&
+                b.status !== 'Completed' &&
+                b.status !== 'completed'
+            );
 
             return (
               <div id={`service-${service.id}`} key={service.id} className="bg-white rounded-2xl p-4 shadow-sm hover:shadow-xl transition-all duration-300 border border-gray-100 flex flex-col group relative">

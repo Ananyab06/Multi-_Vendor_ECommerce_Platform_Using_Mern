@@ -348,7 +348,7 @@ const Profile = () => {
                                 Cancel Order
                               </button>
                             )}
-                            {isDelivered(order.status) && !order.feedback && (
+                            {isDelivered(order.status) && !order.feedback?.rating && (
                               <button
                                 onClick={(e) => openFeedbackModal(order, e)}
                                 className="flex items-center gap-2 text-indigo-700 hover:text-indigo-900 font-medium bg-indigo-50 hover:bg-indigo-100 px-4 py-2 rounded-full transition-colors"
@@ -384,7 +384,7 @@ const Profile = () => {
                               <span>Total:</span>
                               <span>₹{order.total.toFixed(2)}</span>
                             </div>
-                            {order.feedback && (
+                            {order.feedback && order.feedback.rating && (
                               <div className="mt-4 p-4 bg-indigo-50 rounded-xl border border-indigo-100">
                                 <p className="text-sm font-bold text-indigo-800 mb-2">Your Feedback</p>
                                 <div className="flex items-center gap-1 mb-2">
@@ -502,7 +502,7 @@ const Profile = () => {
                                 Cancel Booking
                               </button>
                             )}
-                            {String(service.status).toLowerCase() === 'completed' && !service.feedback && (
+                            {String(service.status).toLowerCase() === 'completed' && !service.feedback?.rating && (
                               <button
                                 onClick={(e) => openServiceFeedbackModal(service, e)}
                                 className="flex items-center gap-2 text-indigo-700 hover:text-indigo-900 font-medium bg-indigo-50 hover:bg-indigo-100 px-4 py-2 rounded-full transition-colors"
@@ -513,7 +513,7 @@ const Profile = () => {
                           </div>
                         </div>
 
-                        {service.feedback && (
+                        {service.feedback && service.feedback.rating && (
                           <div className="mt-4 p-4 bg-indigo-50/50 rounded-xl border border-indigo-100/50">
                             <p className="text-xs font-black uppercase tracking-wider text-indigo-600 mb-2">Your Feedback</p>
                             <div className="flex items-center gap-1 mb-2">

@@ -135,7 +135,18 @@ export const AppProvider = ({ children }) => {
           const bookingsRes = await api.getUserServiceBookings();
 
           if (bookingsRes.data) {
-            setServiceBookings(bookingsRes.data);
+            const transformedBookings = bookingsRes.data.map(booking => ({
+              ...booking,
+              id: booking._id?.toString() || booking.id,
+              feedback: booking.feedback?.rating
+                ? {
+                    rating: booking.feedback.rating,
+                    comment: booking.feedback.comment || '',
+                    createdAt: booking.feedback.createdAt,
+                  }
+                : null,
+            }));
+            setServiceBookings(transformedBookings);
           }
           
           if (cartRes.data?.items?.length) {
@@ -195,7 +206,12 @@ export const AppProvider = ({ children }) => {
           const vendorId = user.id || user._id;
           const bookingsRes = await api.getVendorServiceBookings(vendorId);
           const bookings = bookingsRes.data?.bookings || bookingsRes.data || [];
-          setServiceBookings(Array.isArray(bookings) ? bookings : []);
+          const transformed = (Array.isArray(bookings) ? bookings : []).map(b => ({
+            ...b,
+            id: b._id?.toString() || b.id,
+            feedback: b.feedback?.rating ? b.feedback : null
+          }));
+          setServiceBookings(transformed);
         } catch (err) {
           console.error('Failed to fetch vendor service bookings', err);
           setServiceBookings([]);
@@ -448,7 +464,11 @@ export const AppProvider = ({ children }) => {
 
     try {
       const response = await api.createServiceBooking(booking);
-      const saved = response.data.booking;
+      const saved = {
+        ...response.data.booking,
+        id: response.data.booking._id?.toString() || response.data.booking.id,
+        feedback: response.data.booking.feedback?.rating ? response.data.booking.feedback : null
+      };
       setServiceBookings((prev) => [...prev, saved]);
       return { success: true, booking: saved };
     } catch (err) {
@@ -464,7 +484,12 @@ export const AppProvider = ({ children }) => {
       const response = await api.updateServiceBookingStatus(bookingId, newStatus);
       const updated = response.data.booking;
       setServiceBookings((prev) =>
-        prev.map((b) => (b.id === bookingId ? { ...b, ...updated } : b))
+        prev.map((b) => (b.id === bookingId ? {
+          ...b,
+          ...updated,
+          id: updated._id?.toString() || updated.id,
+          feedback: updated.feedback?.rating ? updated.feedback : null
+        } : b))
       );
     } catch (err) {
       console.error('Failed to update booking status', err);
@@ -478,10 +503,22 @@ export const AppProvider = ({ children }) => {
       if (user.isVendor) {
         const vendorId = user.id || user._id;
         const res = await api.getVendorServiceBookings(vendorId);
-        setServiceBookings(res.data?.bookings || []);
+        const bookings = res.data?.bookings || res.data || [];
+        const transformed = (Array.isArray(bookings) ? bookings : []).map(b => ({
+          ...b,
+          id: b._id?.toString() || b.id,
+          feedback: b.feedback?.rating ? b.feedback : null
+        }));
+        setServiceBookings(transformed);
       } else {
         const res = await api.getUserServiceBookings();
-        setServiceBookings(res.data || []);
+        const bookings = res.data || [];
+        const transformed = bookings.map(b => ({
+          ...b,
+          id: b._id?.toString() || b.id,
+          feedback: b.feedback?.rating ? b.feedback : null
+        }));
+        setServiceBookings(transformed);
       }
     } catch (err) {
       console.error('Failed to refresh service bookings', err);
